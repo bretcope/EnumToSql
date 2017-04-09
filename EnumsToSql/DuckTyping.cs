@@ -61,7 +61,7 @@ namespace EnumsToSql
 
                 if (tableName.Contains("[") || tableName.Contains("]"))
                     throw new InvalidOperationException($"TableName \"{tableName}\" contains illegal characters. Enum: {enumType.FullName}");
-
+                
                 var idColumnSize = 0;
                 if (idColumnSizeProp != null)
                 {

@@ -45,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="BackingTypeInfo.cs" />
     <Compile Include="DuckTyping.cs" />
     <Compile Include="DeletionMode.cs" />
     <Compile Include="EnumInfo.cs" />

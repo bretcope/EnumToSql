@@ -143,26 +143,32 @@ namespace EnumsToSql
             return enumInfos;
         }
 
-        static EnumInfo TryGetEnumInfoFromType(Type type, XmlTypeDescription xmlDoc)
+        static EnumInfo TryGetEnumInfoFromType(Type enumType, XmlTypeDescription xmlDoc)
         {
-            var attrInfo = DuckTyping.GetEnumSqlTableInfo(type);
+            var attrInfo = DuckTyping.GetEnumSqlTableInfo(enumType);
 
             if (attrInfo == null) // the enum wasn't marked with the EnumSqlTable attribute
                 return null;
 
-            var backingType = type.GetEnumUnderlyingType();
+            var backingTypeInfo = BackingTypeInfo.Get(enumType);
 
             var idColumnSize = attrInfo.IdColumnSize;
             if (idColumnSize == 0)
-                idColumnSize = Marshal.SizeOf(backingType);
+            {
+                idColumnSize = backingTypeInfo.Size;
+            }
+            else if (idColumnSize < backingTypeInfo.Size)
+            {
+                throw new Exception($"IdColumnSize ({idColumnSize}) is smaller than the backing type for enum {enumType.FullName}");
+            }
 
             var idColumnName = attrInfo.IdColumnName;
             if (string.IsNullOrWhiteSpace(idColumnName))
                 idColumnName = "Id";
 
-            var values = GetEnumValues(type, xmlDoc);
+            var values = GetEnumValues(enumType, xmlDoc);
 
-            return new EnumInfo(attrInfo.TableName, idColumnSize, idColumnName, type, backingType, values);
+            return new EnumInfo(attrInfo.TableName, idColumnSize, idColumnName, enumType, backingTypeInfo, values);
         }
 
         static List<EnumValue> GetEnumValues(Type type, XmlTypeDescription xmlDoc)

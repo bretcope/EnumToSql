@@ -31,19 +31,19 @@ namespace EnumsToSql
         /// <summary>
         /// The enum's backing type.
         /// </summary>
-        public Type BackingType { get; }
+        public BackingTypeInfo BackingTypeInfo { get; }
         /// <summary>
         /// Information about the enum's values.
         /// </summary>
         public List<EnumValue> Values { get; }
 
-        internal EnumInfo(string tableName, int idColumnSize, string idColumnName, Type type, Type backingType, List<EnumValue> values)
+        internal EnumInfo(string tableName, int idColumnSize, string idColumnName, Type type, BackingTypeInfo backingTypeInfo, List<EnumValue> values)
         {
             TableName = tableName;
             IdColumnSize = idColumnSize;
             IdColumnName = idColumnName;
             Type = type;
-            BackingType = backingType;
+            BackingTypeInfo = backingTypeInfo;
             Values = values;
         }
     }
