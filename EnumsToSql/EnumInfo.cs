@@ -21,6 +21,10 @@ namespace EnumsToSql
         /// </summary>
         public string TableName { get; }
         /// <summary>
+        /// The SQL Server schema name for the enum's table.
+        /// </summary>
+        public string SchemaName { get; }
+        /// <summary>
         /// The size (in bytes) of the Id column for the table. Must be 1, 2, 4, or 8.
         /// </summary>
         public int IdColumnSize { get; }
@@ -41,11 +45,12 @@ namespace EnumsToSql
         /// </summary>
         public EnumValue[] Values { get; }
 
-        EnumInfo(string tableName, int idColumnSize, string idColumnName, Type type, BackingTypeInfo backingTypeInfo, EnumValue[] values)
+        EnumInfo(string tableName, string schemaName, int idColumnSize, string idColumnName, Type type, BackingTypeInfo backingTypeInfo, EnumValue[] values)
         {
-            TableName = tableName;
+            TableName = TrimSqlName(tableName);
+            SchemaName = TrimSqlName(schemaName);
             IdColumnSize = idColumnSize;
-            IdColumnName = idColumnName;
+            IdColumnName = TrimSqlName(idColumnName);
             Type = type;
             BackingTypeInfo = backingTypeInfo;
             Values = values;
@@ -145,6 +150,10 @@ namespace EnumsToSql
             if (attrInfo == null) // the enum wasn't marked with the EnumSqlTable attribute
                 return null;
 
+            var schemaName = attrInfo.SchemaName;
+            if (string.IsNullOrWhiteSpace(schemaName))
+                schemaName = "dbo";
+
             var backingTypeInfo = BackingTypeInfo.Get(enumType);
 
             var idColumnSize = attrInfo.IdColumnSize;
@@ -163,7 +172,7 @@ namespace EnumsToSql
 
             var values = GetEnumValues(enumType, xmlDoc);
 
-            return new EnumInfo(attrInfo.TableName, idColumnSize, idColumnName, enumType, backingTypeInfo, values);
+            return new EnumInfo(attrInfo.TableName, schemaName, idColumnSize, idColumnName, enumType, backingTypeInfo, values);
         }
 
         static EnumValue[] GetEnumValues(Type enumType, XmlTypeDescription xmlDoc)
@@ -203,6 +212,17 @@ namespace EnumsToSql
             }
 
             return values;
+        }
+
+        static string TrimSqlName(string name)
+        {
+            name = name.Trim();
+            if (name.StartsWith("[") && name.EndsWith("]") && name.Length > 2)
+            {
+                name = name.Substring(1, name.Length - 2);
+            }
+
+            return name;
         }
     }
 }

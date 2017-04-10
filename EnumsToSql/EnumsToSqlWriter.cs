@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
+﻿using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
 
 namespace EnumsToSql
 {
@@ -58,11 +53,16 @@ namespace EnumsToSql
         /// <param name="logger">The stream to send logging information to.</param>
         public void UpdateDatabase(SqlConnection conn, DeletionMode deletionMode, TextWriter logger)
         {
-            // create and read tables
+            logger.WriteLine($"Updating database {conn.Database} on {conn.DataSource}");
 
-            // determine differences
+            foreach (var enumInfo in Enums)
+            {
+                logger.WriteLine($"    Updating {enumInfo.SchemaName}.{enumInfo.TableName}");
 
-            // perform updates
+                var existing = SqlExecutor.GetTableRows(conn, enumInfo);
+
+                //
+            }
         }
     }
 }
