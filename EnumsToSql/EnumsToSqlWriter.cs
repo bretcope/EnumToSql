@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
@@ -171,10 +172,39 @@ namespace EnumsToSql
             return new EnumInfo(attrInfo.TableName, idColumnSize, idColumnName, enumType, backingTypeInfo, values);
         }
 
-        static List<EnumValue> GetEnumValues(Type type, XmlTypeDescription xmlDoc)
+        static EnumValue[] GetEnumValues(Type enumType, XmlTypeDescription xmlDoc)
         {
-            //
-            return null;
+            var fields = enumType.GetFields(BindingFlags.Public | BindingFlags.Static);
+            var values = new EnumValue[fields.Length];
+
+            for (var i = 0; i < fields.Length; i++)
+            {
+                var field = fields[i];
+
+                var id = field.GetRawConstantValue();
+                var name = field.Name;
+                var isActive = field.GetCustomAttribute<ObsoleteAttribute>() == null;
+                
+                // first preference is to get the description from XML comments
+                string description = null;
+                xmlDoc?.FieldSummaries?.TryGetValue(name, out description);
+
+                if (string.IsNullOrWhiteSpace(description))
+                {
+                    // second choice is the Description attribute
+                    description = field.GetCustomAttribute<DescriptionAttribute>()?.Description;
+
+                    if (string.IsNullOrWhiteSpace(description))
+                    {
+                        //  sadly we don't have any description available
+                        description = "";
+                    }
+                }
+
+                values[i] = new EnumValue(id, name, isActive, description);
+            }
+
+            return values;
         }
     }
 }

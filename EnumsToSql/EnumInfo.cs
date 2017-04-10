@@ -35,9 +35,9 @@ namespace EnumsToSql
         /// <summary>
         /// Information about the enum's values.
         /// </summary>
-        public List<EnumValue> Values { get; }
+        public EnumValue[] Values { get; }
 
-        internal EnumInfo(string tableName, int idColumnSize, string idColumnName, Type type, BackingTypeInfo backingTypeInfo, List<EnumValue> values)
+        internal EnumInfo(string tableName, int idColumnSize, string idColumnName, Type type, BackingTypeInfo backingTypeInfo, EnumValue[] values)
         {
             TableName = tableName;
             IdColumnSize = idColumnSize;
