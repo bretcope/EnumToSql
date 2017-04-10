@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.IO;
 
 namespace EnumsToSql
 {
@@ -41,6 +42,69 @@ namespace EnumsToSql
             }
         }
 
+        public static void UpdateTable(SqlConnection conn, EnumInfo enumInfo, TableUpdatePlan plan, DeletionMode deletionMode, TextWriter logger)
+        {
+            if (plan.Add.Count == 0 && plan.Update.Count == 0 && (plan.Delete.Count == 0 || deletionMode == DeletionMode.DoNothing))
+                return;
+            
+            logger.WriteLine($"    Updating {enumInfo.SchemaName}.{enumInfo.TableName}");
+
+            var table = $"[{EscapeSqlName(enumInfo.SchemaName)}].[{EscapeSqlName(enumInfo.TableName)}]";
+            var idCol = "[" + EscapeSqlName(enumInfo.IdColumnName) + "]";
+
+            if (plan.Add.Count > 0)
+            {
+                var sql = $"insert into {table} ({idCol}, Name, Description, IsActive) values (@id, @name, @description, @isActive);";
+
+                foreach (var row in plan.Add)
+                {
+                    ExecuteUpdate(conn, sql, row);
+                    logger.WriteLine($"        Added {row.Name}");
+                }
+            }
+
+            if (plan.Update.Count > 0)
+            {
+                var sql = $"update {table} set Name = @name, Description = @description, IsActive = @isActive where {idCol} = @id;";
+
+                foreach (var row in plan.Update)
+                {
+                    ExecuteUpdate(conn, sql, row);
+                    logger.WriteLine($"        Updated {row.Name}");
+                }
+            }
+
+            if (plan.Delete.Count > 0 && deletionMode != DeletionMode.DoNothing)
+            {
+                string sql, successMessage;
+
+                if (deletionMode == DeletionMode.MarkAsInactive)
+                {
+                    sql = $"update {table} set IsActive = 0 where {idCol} = @id;";
+                    successMessage = "        Marked deleted value \"{0}\" as inactive";
+                }
+                else
+                {
+                    sql = $"delete from {table} where {idCol} = @id;";
+                    successMessage = "        Deleted {0}";
+                }
+
+                var ignoreConstraintViolations = deletionMode == DeletionMode.TryDelete;
+
+                foreach (var row in plan.Delete)
+                {
+                    if (ExecuteDelete(conn, sql, row.Id, ignoreConstraintViolations))
+                    {
+                        logger.WriteLine(successMessage, row.Name);
+                    }
+                    else
+                    {
+                        logger.WriteLine($"        Attempted to delete {row.Name}, but failed due to SQL constraints (probably a foreign key)");
+                    }
+                }
+            }
+        }
+
         static string CreateTableAndSelect(EnumInfo enumInfo)
         {
             var schemaString = EscapeString(enumInfo.SchemaName);
@@ -65,7 +129,7 @@ begin
     );
 end
 
-select * from [{schema}].[{table}];
+select * from [{schema}].[{table}] order by [{id}] asc;
 ";
         }
 
@@ -116,6 +180,40 @@ select * from [{schema}].[{table}];
                     return rdr.GetInt64(ID_ORDINAL);
                 default:
                     throw new Exception($"Unexpected Id column size {size}");
+            }
+        }
+
+        static void ExecuteUpdate(SqlConnection conn, string sql, Row row)
+        {
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = sql;
+                cmd.Parameters.AddWithValue("id", row.Id);
+                cmd.Parameters.AddWithValue("name", row.Name);
+                cmd.Parameters.AddWithValue("description", row.Description);
+                cmd.Parameters.AddWithValue("isActive", row.IsActive);
+
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        static bool ExecuteDelete(SqlConnection conn, string sql, long id, bool ignoreConstraintViolations)
+        {
+            try
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = sql;
+                    cmd.Parameters.AddWithValue("id", id);
+
+                    cmd.ExecuteNonQuery();
+
+                    return true;
+                }
+            }
+            catch (SqlException ex) when (ignoreConstraintViolations && ex.Errors.Count > 0 && ex.Errors[0].Number == 547)
+            {
+                return false;
             }
         }
 

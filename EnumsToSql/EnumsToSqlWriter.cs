@@ -57,11 +57,9 @@ namespace EnumsToSql
 
             foreach (var enumInfo in Enums)
             {
-                logger.WriteLine($"    Updating {enumInfo.SchemaName}.{enumInfo.TableName}");
-
-                var existing = SqlExecutor.GetTableRows(conn, enumInfo);
-
-                //
+                var existingRows = SqlExecutor.GetTableRows(conn, enumInfo);
+                var updatePlan = TableUpdatePlan.Create(enumInfo, existingRows);
+                SqlExecutor.UpdateTable(conn, enumInfo, updatePlan, deletionMode, logger);
             }
         }
     }

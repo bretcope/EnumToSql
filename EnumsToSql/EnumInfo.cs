@@ -211,7 +211,20 @@ namespace EnumsToSql
                 values[i] = new EnumValue(id, name, isActive, description);
             }
 
+            Array.Sort(values, ValueComparer);
+
             return values;
+        }
+
+        static int ValueComparer(EnumValue a, EnumValue b)
+        {
+            if (a.LongId < b.LongId)
+                return -1;
+
+            if (a.LongId == b.LongId)
+                return 0;
+
+            return 1;
         }
 
         static string TrimSqlName(string name)
