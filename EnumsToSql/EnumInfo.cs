@@ -177,6 +177,10 @@ namespace EnumsToSql
 
                 var id = field.GetRawConstantValue();
                 var name = field.Name;
+
+                if (name.Length > EnumValue.MAX_NAME_LENGTH)
+                    throw new Exception($"Enum value name exceeds the maximum length of {EnumValue.MAX_NAME_LENGTH}.\n  Enum: {enumType.FullName}\n  Value: {name}");
+
                 var isActive = field.GetCustomAttribute<ObsoleteAttribute>() == null;
 
                 // first preference is to get the description from XML comments
