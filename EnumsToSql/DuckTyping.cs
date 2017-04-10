@@ -56,6 +56,7 @@ namespace EnumsToSql
             if (idColumnNameProp != null && idColumnNameProp.PropertyType != typeof(string))
                 throw new InvalidOperationException($"Type {attrType.FullName} has a property named \"IdColumnName\" but it is not of type string.");
 
+            // if this was going to be called a ton, a dynamic method would be a better choice, but we're not all that concerned about performance
             getter = (attr) =>
             {
                 var tableName = (string)tableNameProp.GetValue(attr);
@@ -63,17 +64,9 @@ namespace EnumsToSql
                 if (string.IsNullOrEmpty(tableName))
                     throw new InvalidOperationException($"TableName is null or empty. Enum: {enumType.FullName}");
 
-                if (HasIllegalSqlCharacters(tableName))
-                    throw new InvalidOperationException($"TableName \"{tableName}\" contains illegal characters. Enum: {enumType.FullName}");
-
                 string schemaName = null;
                 if (schemaNameProp != null)
-                {
                     schemaName = (string)schemaNameProp.GetValue(attr);
-
-                    if (HasIllegalSqlCharacters(schemaName))
-                        throw new InvalidOperationException($"SchemaName \"{schemaName}\" contains illegal characters. Enum: {enumType.FullName}");
-                }
                 
                 var idColumnSize = 0;
                 if (idColumnSizeProp != null)
@@ -95,26 +88,13 @@ namespace EnumsToSql
 
                 string idColumnName = null;
                 if (idColumnNameProp != null)
-                {
                     idColumnName = (string)idColumnNameProp.GetValue(attr);
-
-                    if (HasIllegalSqlCharacters(idColumnName))
-                        throw new InvalidOperationException($"IdColumnName \"{idColumnName}\" contains illegal characters. Enum: {enumType.FullName}");
-                }
 
                 return new EnumSqlTableAttributeInfo(tableName, schemaName, idColumnSize, idColumnName);
             };
 
             s_gettersByType[attrType] = getter;
             return getter;
-        }
-
-        static bool HasIllegalSqlCharacters(string s)
-        {
-            if (s == null)
-                return false;
-
-            return s.Contains("[") || s.Contains("]");
         }
     }
 }
