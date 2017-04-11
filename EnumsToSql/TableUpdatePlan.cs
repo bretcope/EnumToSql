@@ -5,18 +5,20 @@ namespace EnumsToSql
 {
     class TableUpdatePlan
     {
-        public List<Row> Add { get; set; }
-        public List<Row> Update { get; set; }
-        public List<Row> Delete { get; set; }
+        public List<Row> Add { get; }
+        public List<Row> Update { get; }
+        public List<Row> Delete { get; }
+        public DeletionMode DeletionMode { get; }
 
-        TableUpdatePlan(List<Row> add, List<Row> update, List<Row> delete)
+        TableUpdatePlan(List<Row> add, List<Row> update, List<Row> delete, DeletionMode deletionMode)
         {
             Add = add;
             Update = update;
             Delete = delete;
+            DeletionMode = deletionMode;
         }
 
-        public static TableUpdatePlan Create(EnumInfo enumInfo, List<Row> existingRows)
+        public static TableUpdatePlan Create(EnumInfo enumInfo, List<Row> existingRows, DeletionMode deletionMode)
         {
             var add = new List<Row>();
             var update = new List<Row>();
@@ -48,8 +50,14 @@ namespace EnumsToSql
                 else if (value == null || value.LongId > row.Id)
                 {
                     // The next value doesn't exist, or it has an Id greater than the next row. This means a row exists with no matching value. We should mark
-                    // it for deletion. Although, it might not actually get deleted, depending on the DeletionMode used.
-                    delete.Add(row);
+                    // it for deletion, unless deletion mode is do nothing.
+                    if (deletionMode == DeletionMode.Delete
+                        || deletionMode == DeletionMode.TryDelete
+                        || (deletionMode == DeletionMode.MarkAsInactive && row.IsActive))
+                    {
+                        delete.Add(row);
+                    }
+
                     ri++;
                 }
                 else
@@ -68,7 +76,7 @@ namespace EnumsToSql
                 }
             }
 
-            return new TableUpdatePlan(add, update, delete);
+            return new TableUpdatePlan(add, update, delete, deletionMode);
         }
     }
 }

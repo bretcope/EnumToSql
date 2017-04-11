@@ -42,9 +42,9 @@ namespace EnumsToSql
             }
         }
 
-        public static void UpdateTable(SqlConnection conn, EnumInfo enumInfo, TableUpdatePlan plan, DeletionMode deletionMode, TextWriter logger)
+        public static void UpdateTable(SqlConnection conn, EnumInfo enumInfo, TableUpdatePlan plan, TextWriter logger)
         {
-            if (plan.Add.Count == 0 && plan.Update.Count == 0 && (plan.Delete.Count == 0 || deletionMode == DeletionMode.DoNothing))
+            if (plan.Add.Count == 0 && plan.Update.Count == 0 && plan.Delete.Count == 0)
                 return;
             
             logger.WriteLine($"    Updating {enumInfo.SchemaName}.{enumInfo.TableName}");
@@ -74,11 +74,11 @@ namespace EnumsToSql
                 }
             }
 
-            if (plan.Delete.Count > 0 && deletionMode != DeletionMode.DoNothing)
+            if (plan.Delete.Count > 0)
             {
                 string sql, successMessage;
 
-                if (deletionMode == DeletionMode.MarkAsInactive)
+                if (plan.DeletionMode == DeletionMode.MarkAsInactive)
                 {
                     sql = $"update {table} set IsActive = 0 where {idCol} = @id;";
                     successMessage = "        Marked deleted value \"{0}\" as inactive";
@@ -89,7 +89,7 @@ namespace EnumsToSql
                     successMessage = "        Deleted {0}";
                 }
 
-                var ignoreConstraintViolations = deletionMode == DeletionMode.TryDelete;
+                var ignoreConstraintViolations = plan.DeletionMode == DeletionMode.TryDelete;
 
                 foreach (var row in plan.Delete)
                 {

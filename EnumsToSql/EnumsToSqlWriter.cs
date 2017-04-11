@@ -70,8 +70,8 @@ namespace EnumsToSql
             foreach (var enumInfo in Enums)
             {
                 var existingRows = SqlExecutor.GetTableRows(conn, enumInfo);
-                var updatePlan = TableUpdatePlan.Create(enumInfo, existingRows);
-                SqlExecutor.UpdateTable(conn, enumInfo, updatePlan, deletionMode, logger);
+                var updatePlan = TableUpdatePlan.Create(enumInfo, existingRows, deletionMode);
+                SqlExecutor.UpdateTable(conn, enumInfo, updatePlan, logger);
             }
         }
     }
