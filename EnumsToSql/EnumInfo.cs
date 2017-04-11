@@ -131,15 +131,18 @@ namespace EnumsToSql
 
             // log information
             logger.WriteLine($"Found {enumInfos.Count} enums:");
-            var maxEnumName = enumInfos.Select(ei => ei.FullName.Length).Max();
-            var format = $"    {{0,-{Math.Max(4, maxEnumName)}}}  {{1}}";
-
-            logger.WriteLine();
-            logger.WriteLine(format, "Enum", "SQL Table");
-            logger.WriteLine(format, "----", "---------");
-            foreach (var ei in enumInfos)
+            if (enumInfos.Count > 0)
             {
-                logger.WriteLine(format, ei.FullName, ei.TableName);
+                var maxEnumName = enumInfos.Select(ei => ei.FullName.Length).Max();
+                var format = $"    {{0,-{Math.Max(4, maxEnumName)}}}  {{1}}";
+
+                logger.WriteLine();
+                logger.WriteLine(format, "Enum", "SQL Table");
+                logger.WriteLine(format, "----", "---------");
+                foreach (var ei in enumInfos)
+                {
+                    logger.WriteLine(format, ei.FullName, ei.TableName);
+                }
             }
             logger.WriteLine();
 

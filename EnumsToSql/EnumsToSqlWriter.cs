@@ -44,6 +44,9 @@ namespace EnumsToSql
         /// <param name="logger">The stream to send logging information to.</param>
         public void UpdateDatabase(string connectionString, DeletionMode deletionMode, TextWriter logger)
         {
+            if (Enums.Count == 0)
+                return;
+
             using (var conn = new SqlConnection(connectionString))
             {
                 conn.Open();
@@ -59,6 +62,9 @@ namespace EnumsToSql
         /// <param name="logger">The stream to send logging information to.</param>
         public void UpdateDatabase(SqlConnection conn, DeletionMode deletionMode, TextWriter logger)
         {
+            if (Enums.Count == 0)
+                return;
+
             logger.WriteLine($"Updating database {conn.Database} on {conn.DataSource}");
 
             foreach (var enumInfo in Enums)
