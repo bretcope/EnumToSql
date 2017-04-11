@@ -7,17 +7,15 @@ namespace EnumsToSql
     // Provides duck-typing for the EnumSqlTable attribute
     static class DuckTyping
     {
-        public const string ATTRIBUTE_NAME = "EnumSqlTableAttribute";
-
         delegate EnumSqlTableAttributeInfo Getter(Attribute attr);
 
         static readonly Dictionary<Type, Getter> s_gettersByType = new Dictionary<Type, Getter>();
 
-        public static EnumSqlTableAttributeInfo GetEnumSqlTableInfo(Type enumType)
+        public static EnumSqlTableAttributeInfo GetEnumSqlTableInfo(Type enumType, string attributeName)
         {
             foreach (var data in enumType.GetCustomAttributesData())
             {
-                if (data.AttributeType.Name == ATTRIBUTE_NAME)
+                if (data.AttributeType.Name == attributeName)
                 {
                     var attr = enumType.GetCustomAttribute(data.AttributeType);
                     var attrType = attr.GetType();

@@ -56,10 +56,10 @@ namespace EnumsToSql
             Values = values;
         }
 
-        internal static List<EnumInfo> GetEnumsFromAssemblies(IEnumerable<string> assemblyFiles, TextWriter logger)
+        internal static List<EnumInfo> GetEnumsFromAssemblies(IEnumerable<string> assemblyFiles, string attributeName, TextWriter logger)
         {
             var asmInfos = LoadAssemblies(assemblyFiles, logger);
-            return GetEnumInfos(asmInfos, logger);
+            return GetEnumInfos(asmInfos, attributeName, logger);
         }
 
         static List<AssemblyInfo> LoadAssemblies(IEnumerable<string> assemblyFiles, TextWriter logger)
@@ -106,8 +106,11 @@ namespace EnumsToSql
             return null;
         }
 
-        static List<EnumInfo> GetEnumInfos(List<AssemblyInfo> asmInfos, TextWriter logger)
+        static List<EnumInfo> GetEnumInfos(List<AssemblyInfo> asmInfos, string attributeName, TextWriter logger)
         {
+            if (!attributeName.EndsWith("Attribute"))
+                attributeName += "Attribute";
+
             var enumInfos = new List<EnumInfo>();
 
             foreach (var asmInfo in asmInfos)
@@ -120,7 +123,7 @@ namespace EnumsToSql
                     XmlTypeDescription xmlDoc = null;
                     asmInfo.XmlDocument?.TypesDescriptions?.TryGetValue(type.FullName, out xmlDoc);
 
-                    var enumInfo = TryGetEnumInfoFromType(type, xmlDoc);
+                    var enumInfo = TryGetEnumInfoFromType(type, attributeName, xmlDoc);
                     if (enumInfo != null)
                         enumInfos.Add(enumInfo);
                 }
@@ -143,9 +146,9 @@ namespace EnumsToSql
             return enumInfos;
         }
 
-        static EnumInfo TryGetEnumInfoFromType(Type enumType, XmlTypeDescription xmlDoc)
+        static EnumInfo TryGetEnumInfoFromType(Type enumType, string attributeName, XmlTypeDescription xmlDoc)
         {
-            var attrInfo = DuckTyping.GetEnumSqlTableInfo(enumType);
+            var attrInfo = DuckTyping.GetEnumSqlTableInfo(enumType, attributeName);
 
             if (attrInfo == null) // the enum wasn't marked with the EnumSqlTable attribute
                 return null;

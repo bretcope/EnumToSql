@@ -10,6 +10,11 @@ namespace EnumsToSql
     public class EnumsToSqlWriter
     {
         /// <summary>
+        /// The default name of the attribute which marks enums for replication.
+        /// </summary>
+        public const string DEFAULT_ATTRIBUTE_NAME = "EnumSqlTable";
+
+        /// <summary>
         /// The list of enums which will be replicated to SQL.
         /// </summary>
         public List<EnumInfo> Enums { get; }
@@ -24,9 +29,10 @@ namespace EnumsToSql
         /// </summary>
         /// <param name="assemblyFiles">The assembly file names to load (including relative or absolute paths).</param>
         /// <param name="logger">The stream to send logging information to.</param>
-        public static EnumsToSqlWriter Create(IEnumerable<string> assemblyFiles, TextWriter logger)
+        /// <param name="attributeName">The name of the attribute which marks enums for replication.</param>
+        public static EnumsToSqlWriter Create(IEnumerable<string> assemblyFiles, TextWriter logger, string attributeName = DEFAULT_ATTRIBUTE_NAME)
         {
-            var enumInfos = EnumInfo.GetEnumsFromAssemblies(assemblyFiles, logger);
+            var enumInfos = EnumInfo.GetEnumsFromAssemblies(assemblyFiles, attributeName, logger);
             return new EnumsToSqlWriter(enumInfos);
         }
 
