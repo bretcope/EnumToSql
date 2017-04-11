@@ -108,7 +108,7 @@ namespace EnumsToSql
         static DeletionMode GetDeletionMode(Dictionary<string, string> args)
         {
             string deleteString;
-            if (args.TryGetValue(FORMAT, out deleteString))
+            if (args.TryGetValue(DELETE_MODE, out deleteString))
             {
                 switch (deleteString.ToLowerInvariant())
                 {
