@@ -14,7 +14,7 @@ namespace EnumsToSql
         const string DB = "--db";
         const string SERVER = "--server";
         const string ATTR = "--attr";
-        const string DELETED = "--deleted";
+        const string DELETE_MODE = "--delete-mode";
         const string FORMAT = "--format";
         const string PREVIEW = "--preview";
         const string HELP = "--help";
@@ -121,7 +121,7 @@ namespace EnumsToSql
                     case "try-delete":
                         return DeletionMode.TryDelete;
                     default:
-                        throw new Exception($"Invalid argument value: {DELETED} \"{deleteString}\"");
+                        throw new Exception($"Invalid argument value: {DELETE_MODE} \"{deleteString}\"");
                 }
             }
 
@@ -223,7 +223,7 @@ OPTIONS
   {ATTR} <value>        The name of the attribute which marks enums for
                         replication to SQL Server. Defaults to ""{EnumsToSqlWriter.DEFAULT_ATTRIBUTE_NAME}"".
 
-  {DELETED} <value>     Controls what happens when an enum value no longer
+  {DELETE_MODE} <value> Controls what happens when an enum value no longer
                         exists in code, but still exists as a database row.
 
                         Possible values:
@@ -274,7 +274,7 @@ OPTIONS
                     case DB:
                     case SERVER:
                     case ATTR:
-                    case DELETED:
+                    case DELETE_MODE:
                     case FORMAT:
                         var value = i + 1 < args.Length ? args[i + 1] : null;
                         if (value == null || value.StartsWith("--"))
