@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.IO;
+using EnumsToSql.Logging;
 
 namespace EnumsToSql
 {
@@ -42,65 +42,74 @@ namespace EnumsToSql
             }
         }
 
-        public static void UpdateTable(SqlConnection conn, EnumInfo enumInfo, TableUpdatePlan plan, TextWriter logger)
+        public static void UpdateTable(SqlConnection conn, EnumInfo enumInfo, TableUpdatePlan plan, Logger logger)
         {
             if (plan.Add.Count == 0 && plan.Update.Count == 0 && plan.Delete.Count == 0)
                 return;
-            
-            logger.WriteLine($"    Updating {enumInfo.SchemaName}.{enumInfo.TableName}");
 
-            var table = $"[{EscapeSqlName(enumInfo.SchemaName)}].[{EscapeSqlName(enumInfo.TableName)}]";
-            var idCol = "[" + EscapeSqlName(enumInfo.IdColumnName) + "]";
-
-            if (plan.Add.Count > 0)
+            using (logger.OpenBlock($"Updating {enumInfo.SchemaName}.{enumInfo.TableName}"))
             {
-                var sql = $"insert into {table} ({idCol}, Name, Description, IsActive) values (@id, @name, @description, @isActive);";
-
-                foreach (var row in plan.Add)
+                try
                 {
-                    ExecuteUpdate(conn, sql, row);
-                    logger.WriteLine($"        Added {row.Name}");
-                }
-            }
+                    var table = $"[{EscapeSqlName(enumInfo.SchemaName)}].[{EscapeSqlName(enumInfo.TableName)}]";
+                    var idCol = "[" + EscapeSqlName(enumInfo.IdColumnName) + "]";
 
-            if (plan.Update.Count > 0)
-            {
-                var sql = $"update {table} set Name = @name, Description = @description, IsActive = @isActive where {idCol} = @id;";
-
-                foreach (var row in plan.Update)
-                {
-                    ExecuteUpdate(conn, sql, row);
-                    logger.WriteLine($"        Updated {row.Name}");
-                }
-            }
-
-            if (plan.Delete.Count > 0)
-            {
-                string sql, successMessage;
-
-                if (plan.DeletionMode == DeletionMode.MarkAsInactive)
-                {
-                    sql = $"update {table} set IsActive = 0 where {idCol} = @id;";
-                    successMessage = "        Marked deleted value \"{0}\" as inactive";
-                }
-                else
-                {
-                    sql = $"delete from {table} where {idCol} = @id;";
-                    successMessage = "        Deleted {0}";
-                }
-
-                var ignoreConstraintViolations = plan.DeletionMode == DeletionMode.TryDelete;
-
-                foreach (var row in plan.Delete)
-                {
-                    if (ExecuteDelete(conn, sql, row.Id, ignoreConstraintViolations))
+                    if (plan.Add.Count > 0)
                     {
-                        logger.WriteLine(successMessage, row.Name);
+                        var sql = $"insert into {table} ({idCol}, Name, Description, IsActive) values (@id, @name, @description, @isActive);";
+
+                        foreach (var row in plan.Add)
+                        {
+                            ExecuteUpdate(conn, sql, row);
+                            logger.Info($"Added {row.Name}");
+                        }
                     }
-                    else
+
+                    if (plan.Update.Count > 0)
                     {
-                        logger.WriteLine($"        Attempted to delete {row.Name}, but failed due to SQL constraints (probably a foreign key)");
+                        var sql = $"update {table} set Name = @name, Description = @description, IsActive = @isActive where {idCol} = @id;";
+
+                        foreach (var row in plan.Update)
+                        {
+                            ExecuteUpdate(conn, sql, row);
+                            logger.Info($"Updated {row.Name}");
+                        }
                     }
+
+                    if (plan.Delete.Count > 0)
+                    {
+                        string sql, successMessage;
+
+                        if (plan.DeletionMode == DeletionMode.MarkAsInactive)
+                        {
+                            sql = $"update {table} set IsActive = 0 where {idCol} = @id;";
+                            successMessage = "Marked deleted value \"{0}\" as inactive";
+                        }
+                        else
+                        {
+                            sql = $"delete from {table} where {idCol} = @id;";
+                            successMessage = "Deleted {0}";
+                        }
+
+                        var ignoreConstraintViolations = plan.DeletionMode == DeletionMode.TryDelete;
+
+                        foreach (var row in plan.Delete)
+                        {
+                            if (ExecuteDelete(conn, sql, row.Id, ignoreConstraintViolations))
+                            {
+                                logger.Info(string.Format(successMessage, row.Name));
+                            }
+                            else
+                            {
+                                logger.Warning($"Attempted to delete {row.Name}, but failed due to SQL constraints (probably a foreign key)");
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.Exception(ex);
+                    throw new EnumsToSqlException($"Failed to update table {enumInfo.SchemaName}.{enumInfo.TableName}", isLogged: true);
                 }
             }
         }

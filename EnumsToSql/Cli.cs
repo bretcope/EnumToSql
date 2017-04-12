@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using EnumsToSql.Logging;
 
 namespace EnumsToSql
 {
@@ -16,181 +17,12 @@ namespace EnumsToSql
         const string ATTR = "--attr";
         const string DELETE_MODE = "--delete-mode";
         const string FORMAT = "--format";
+        const string DELIMITER = "--delimiter";
+        const string NO_PARALLEL = "--no-parallel";
         const string PREVIEW = "--preview";
         const string HELP = "--help";
 
-        /// <summary>
-        /// The name of the executable (used in the help message).
-        /// </summary>
-        public static string ExeName { get; set; } = "EnumsToSql";
-
-        /// <summary>
-        /// Executes the EnumToSql program based on command line parameters. Returns true if it executed successfully.
-        /// </summary>
-        /// <param name="args">An array of command line arguments.</param>
-        /// <param name="output">The stream where to send output (for example, Console.Out).</param>
-        public static bool Execute(string[] args, TextWriter output)
-        {
-            try
-            {
-                var argsDictionary = GetArgumentsDictionary(args);
-
-                if (argsDictionary.Count == 0 || argsDictionary.ContainsKey(HELP))
-                {
-                    WriteHelp(output);
-                    return true;
-                }
-
-                var files = GetAssemblyFiles(argsDictionary);
-                //var format = GetFormat(argsDictionary); // todo: fix logger to actually use format
-                var attributeName = argsDictionary.ContainsKey(ATTR) ? argsDictionary[ATTR] : EnumsToSqlWriter.DEFAULT_ATTRIBUTE_NAME;
-                var writer = EnumsToSqlWriter.Create(files, Console.Out, attributeName);
-
-                if (!argsDictionary.ContainsKey(PREVIEW))
-                {
-                    var conns = GetConnectionStrings(argsDictionary);
-
-                    var deletionMode = GetDeletionMode(argsDictionary);
-                    // todo: make parallel version
-                    foreach (var conn in conns)
-                    {
-                        writer.UpdateDatabase(conn, deletionMode, Console.Out);
-                    }
-
-                    Console.WriteLine("Updates complete");
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                output.WriteLine(ex);
-                output.WriteLine();
-                WriteHelp(output);
-
-                return false;
-            }
-        }
-
-        static string[] GetAssemblyFiles(Dictionary<string, string> args)
-        {
-            if (args.ContainsKey(ASM))
-            {
-                var asm = args[ASM];
-                var files = asm.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
-
-                if (files.Length > 0)
-                    return files;
-            }
-
-            throw new Exception($"Argument missing: {ASM}");
-        }
-
-        static OutputFormat GetFormat(Dictionary<string, string> args)
-        {
-            string formatString;
-            if (args.TryGetValue(FORMAT, out formatString))
-            {
-                switch (formatString.ToLowerInvariant())
-                {
-                    case "none":
-                        return OutputFormat.None;
-                    case "teamcity":
-                        return OutputFormat.TeamCity;
-                    default:
-                        throw new Exception($"Invalid argument value: {FORMAT} \"{formatString}\"");
-                }
-            }
-
-            return OutputFormat.None;
-        }
-
-        static DeletionMode GetDeletionMode(Dictionary<string, string> args)
-        {
-            string deleteString;
-            if (args.TryGetValue(DELETE_MODE, out deleteString))
-            {
-                switch (deleteString.ToLowerInvariant())
-                {
-                    case "mark-inactive":
-                        return DeletionMode.MarkAsInactive;
-                    case "do-nothing":
-                        return DeletionMode.DoNothing;
-                    case "delete":
-                        return DeletionMode.Delete;
-                    case "try-delete":
-                        return DeletionMode.TryDelete;
-                    default:
-                        throw new Exception($"Invalid argument value: {DELETE_MODE} \"{deleteString}\"");
-                }
-            }
-
-            return DeletionMode.MarkAsInactive;
-        }
-
-        static string[] GetConnectionStrings(Dictionary<string, string> args)
-        {
-            if (args.ContainsKey(CONN))
-            {
-                if (args.ContainsKey(DB))
-                    throw new Exception($"Cannot use both {CONN} and {DB}");
-
-                var conns = args[CONN].Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
-
-                if (conns.Length == 0)
-                    throw new Exception($"No {CONN} values were provided");
-
-                // ensure the list of connections is unique
-                var connHash = new HashSet<string>();
-                foreach (var conn in conns)
-                {
-                    var trimmed = conn.Trim();
-                    if (connHash.Contains(trimmed))
-                        throw new Exception("Duplicate connection strings detected");
-
-                    connHash.Add(trimmed);
-                }
-
-                return conns;
-            }
-
-            if (args.ContainsKey(DB))
-            {
-                string server;
-                if (!args.TryGetValue(SERVER, out server))
-                    server = "localhost";
-
-                var dbs = args[DB].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-                if (dbs.Length == 0)
-                    throw new Exception($"No {CONN} values were provided");
-
-                var conns = new string[dbs.Length];
-                var dbHash = new HashSet<string>();
-                for (var i = 0; i < dbs.Length; i++)
-                {
-                    var db = dbs[i];
-
-                    var trimmed = db.Trim();
-                    if (dbHash.Contains(trimmed))
-                        throw new Exception($"Duplicate database \"{trimmed}\"");
-
-                    dbHash.Add(trimmed);
-
-                    conns[i] = $"Integrated Security=true;Initial Catalog={trimmed};server={server.Trim()}";
-                }
-
-                return conns;
-            }
-
-            throw new Exception($"Must provide either {CONN} or {DB} arguments");
-        }
-
-        static void WriteHelp(TextWriter output)
-        {
-            output.Write($@"Usage: {ExeName} [OPTIONS]+
-
-  Replicates enums in the selected assemblies to SQL Server.
+        static readonly string s_helpMessage = $@"Replicates enums in the selected assemblies to SQL Server.
 
   You must provide the {ASM} argument, and at least one of: {CONN}, {DB} or
   {PREVIEW}.
@@ -245,15 +77,226 @@ OPTIONS
 
   {FORMAT} <value>      Sets the output format. Possible values:
 
-                            ""none"":     (default) No special formatting.
+                            ""plain"":       (default) Nested blocks are indented.
 
-                            ""teamcity"": Adds TeamCity block annotations to output.
+                            ""timestamps"":  Messages have timestamps. Nested
+                                             blocks are indented.
+
+                            ""colors"":      Nested blocks are indented. Messages
+                                             are color-coded.
+
+                            ""time-colors"": Messages have timestamps. Nested
+                                             blocks are indented. Messages are
+                                             color-coded.
+
+                            ""teamcity"":    Adds TeamCity block annotations to
+                                             output.
+
+  {DELIMITER} <value>   Allows you to specify a delimiter other than a comma for
+                        the comma-delimited arguments.
+
+  {NO_PARALLEL}         Forces each database to be updated in serial. If one
+                        database fails to update, no subsequent databases will
+                        be attempted.
 
   {PREVIEW}             Prints which enums were found in the assemblies, but
                         does not replicate them to SQL.
 
   {HELP}                Prints this help message.
-");
+";
+
+        /// <summary>
+        /// Executes the EnumToSql program based on command line parameters. Returns true if it executed successfully.
+        /// </summary>
+        /// <param name="args">An array of command line arguments.</param>
+        /// <param name="output">The stream where to send output (for example, Console.Out).</param>
+        public static bool Execute(string[] args, TextWriter output)
+        {
+            Logger logger = null;
+
+            try
+            {
+                var argsDictionary = GetArgumentsDictionary(args);
+
+                var formatter = GetFormatter(argsDictionary);
+                logger = new Logger(output, formatter);
+
+                if (argsDictionary.Count == 0 || argsDictionary.ContainsKey(HELP))
+                {
+                    logger.Info(s_helpMessage);
+                    return true;
+                }
+
+                var files = GetAssemblyFiles(argsDictionary);
+                var attributeName = argsDictionary.ContainsKey(ATTR) ? argsDictionary[ATTR] : EnumsToSqlWriter.DEFAULT_ATTRIBUTE_NAME;
+                var writer = EnumsToSqlWriter.Create(files, logger, attributeName);
+
+                if (!argsDictionary.ContainsKey(PREVIEW))
+                {
+                    var conns = GetConnectionStrings(argsDictionary);
+
+                    var deletionMode = GetDeletionMode(argsDictionary);
+                    var parallel = !argsDictionary.ContainsKey(NO_PARALLEL);
+
+                    writer.UpdateDatabases(conns, deletionMode, logger, parallel);
+
+                    logger.Info("Updates complete");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                var types = ex as EnumsToSqlException;
+                if (types == null || !types.IsLogged)
+                {
+                    if (logger != null)
+                    {
+                        logger.Exception(ex);
+                    }
+                    else
+                    {
+                        output.WriteLine(ex);
+                        output.WriteLine(ex.StackTrace);
+                        output.WriteLine();
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        static string[] GetAssemblyFiles(Dictionary<string, string> args)
+        {
+            if (args.ContainsKey(ASM))
+            {
+                var asm = args[ASM];
+                var files = asm.Split(new[] {GetDelimiter(args)}, StringSplitOptions.RemoveEmptyEntries);
+
+                if (files.Length > 0)
+                    return files;
+            }
+
+            throw new Exception($"Argument missing: {ASM}");
+        }
+
+        static ILogFormatter GetFormatter(Dictionary<string, string> args)
+        {
+            string formatString;
+            if (args.TryGetValue(FORMAT, out formatString))
+            {
+                switch (formatString.ToLowerInvariant())
+                {
+                    case "plain":
+                        return LogFormatters.Plain;
+                    case "time":
+                    case "timestamp":
+                    case "timestamps":
+                        return LogFormatters.Timestamps;
+                    case "color":
+                    case "colors":
+                        return LogFormatters.Colors;
+                    case "time-colors":
+                    case "times-colors":
+                    case "timestamp-color":
+                    case "timestamp-colors":
+                    case "timestamps-colors":
+                        return LogFormatters.TimestampsColors;
+                    case "teamcity":
+                        return LogFormatters.TeamCity;
+                    default:
+                        throw new Exception($"Invalid argument value: {FORMAT} \"{formatString}\"");
+                }
+            }
+
+            return LogFormatters.Plain;
+        }
+
+        static DeletionMode GetDeletionMode(Dictionary<string, string> args)
+        {
+            string deleteString;
+            if (args.TryGetValue(DELETE_MODE, out deleteString))
+            {
+                switch (deleteString.ToLowerInvariant())
+                {
+                    case "mark-inactive":
+                        return DeletionMode.MarkAsInactive;
+                    case "do-nothing":
+                        return DeletionMode.DoNothing;
+                    case "delete":
+                        return DeletionMode.Delete;
+                    case "try-delete":
+                        return DeletionMode.TryDelete;
+                    default:
+                        throw new Exception($"Invalid argument value: {DELETE_MODE} \"{deleteString}\"");
+                }
+            }
+
+            return DeletionMode.MarkAsInactive;
+        }
+
+        static string[] GetConnectionStrings(Dictionary<string, string> args)
+        {
+            if (args.ContainsKey(CONN))
+            {
+                if (args.ContainsKey(DB))
+                    throw new Exception($"Cannot use both {CONN} and {DB}");
+
+                var conns = args[CONN].Split(new[] {GetDelimiter(args)}, StringSplitOptions.RemoveEmptyEntries);
+
+                if (conns.Length == 0)
+                    throw new Exception($"No {CONN} values were provided");
+
+                // ensure the list of connections is unique
+                var connHash = new HashSet<string>();
+                foreach (var conn in conns)
+                {
+                    var trimmed = conn.Trim();
+                    if (connHash.Contains(trimmed))
+                        throw new Exception("Duplicate connection strings detected");
+
+                    connHash.Add(trimmed);
+                }
+
+                return conns;
+            }
+
+            if (args.ContainsKey(DB))
+            {
+                string server;
+                if (!args.TryGetValue(SERVER, out server))
+                    server = "localhost";
+
+                var dbs = args[DB].Split(new[] {GetDelimiter(args)}, StringSplitOptions.RemoveEmptyEntries);
+
+                if (dbs.Length == 0)
+                    throw new Exception($"No {CONN} values were provided");
+
+                var conns = new string[dbs.Length];
+                var dbHash = new HashSet<string>();
+                for (var i = 0; i < dbs.Length; i++)
+                {
+                    var db = dbs[i];
+
+                    var trimmed = db.Trim();
+                    if (dbHash.Contains(trimmed))
+                        throw new Exception($"Duplicate database \"{trimmed}\"");
+
+                    dbHash.Add(trimmed);
+
+                    conns[i] = $"Integrated Security=true;Initial Catalog={trimmed};server={server.Trim()}";
+                }
+
+                return conns;
+            }
+
+            throw new Exception($"Must provide either {CONN} or {DB} arguments");
+        }
+
+        static string GetDelimiter(Dictionary<string, string> args)
+        {
+            string delim;
+            return args.TryGetValue(DELIMITER, out delim) ? delim : ",";
         }
 
         static Dictionary<string, string> GetArgumentsDictionary(string[] args)
@@ -276,6 +319,7 @@ OPTIONS
                     case ATTR:
                     case DELETE_MODE:
                     case FORMAT:
+                    case DELIMITER:
                         var value = i + 1 < args.Length ? args[i + 1] : null;
                         if (value == null || value.StartsWith("--"))
                             throw new Exception($"Argument \"{a}\" is missing a value.");
@@ -283,6 +327,7 @@ OPTIONS
                         argsDictionary[a] = value;
                         i++;
                         break;
+                    case NO_PARALLEL:
                     case PREVIEW:
                     case HELP:
                         argsDictionary[a] = null;

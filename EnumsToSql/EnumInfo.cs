@@ -4,6 +4,8 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using EnumsToSql.Logging;
 
 namespace EnumsToSql
 {
@@ -56,13 +58,13 @@ namespace EnumsToSql
             Values = values;
         }
 
-        internal static List<EnumInfo> GetEnumsFromAssemblies(IEnumerable<string> assemblyFiles, string attributeName, TextWriter logger)
+        internal static List<EnumInfo> GetEnumsFromAssemblies(IEnumerable<string> assemblyFiles, string attributeName, Logger logger)
         {
             var asmInfos = LoadAssemblies(assemblyFiles, logger);
             return GetEnumInfos(asmInfos, attributeName, logger);
         }
 
-        static List<AssemblyInfo> LoadAssemblies(IEnumerable<string> assemblyFiles, TextWriter logger)
+        static List<AssemblyInfo> LoadAssemblies(IEnumerable<string> assemblyFiles, Logger logger)
         {
             var asmInfos = new List<AssemblyInfo>();
             foreach (var filePath in assemblyFiles)
@@ -70,23 +72,31 @@ namespace EnumsToSql
                 var info = LoadAssembly(filePath, logger);
                 asmInfos.Add(info);
             }
-
-            logger.WriteLine();
+            
             return asmInfos;
         }
 
-        static AssemblyInfo LoadAssembly(string filePath, TextWriter logger)
+        static AssemblyInfo LoadAssembly(string filePath, Logger logger)
         {
             filePath = Path.GetFullPath(filePath);
-            logger.WriteLine($"Loading assembly: {filePath}");
+            using (logger.OpenBlock($"Loading assembly: {filePath}"))
+            {
+                try
+                {
+                    var asm = Assembly.LoadFrom(filePath);
+                    var xml = GetXmlDocument(filePath);
 
-            var asm = Assembly.LoadFrom(filePath);
-            var xml = GetXmlDocument(filePath);
+                    if (xml != null)
+                        logger.Info("Found XML documentation");
 
-            if (xml != null)
-                logger.WriteLine("    Found XML documentation");
-
-            return new AssemblyInfo(asm, xml);
+                    return new AssemblyInfo(asm, xml);
+                }
+                catch (Exception ex)
+                {
+                    logger.Exception(ex);
+                    throw new EnumsToSqlException("Unable to load assembly", ex, isLogged: true);
+                }
+            }
         }
 
         static XmlAssemblyDocument GetXmlDocument(string assemblyFilePath)
@@ -106,7 +116,7 @@ namespace EnumsToSql
             return null;
         }
 
-        static List<EnumInfo> GetEnumInfos(List<AssemblyInfo> asmInfos, string attributeName, TextWriter logger)
+        static List<EnumInfo> GetEnumInfos(List<AssemblyInfo> asmInfos, string attributeName, Logger logger)
         {
             if (!attributeName.EndsWith("Attribute"))
                 attributeName += "Attribute";
@@ -130,21 +140,27 @@ namespace EnumsToSql
             }
 
             // log information
-            logger.WriteLine($"Found {enumInfos.Count} enums:");
-            if (enumInfos.Count > 0)
+            using (logger.OpenBlock($"Found {enumInfos.Count} enums"))
             {
-                var maxEnumName = enumInfos.Select(ei => ei.FullName.Length).Max();
-                var format = $"    {{0,-{Math.Max(4, maxEnumName)}}}  {{1}}";
-
-                logger.WriteLine();
-                logger.WriteLine(format, "Enum", "SQL Table");
-                logger.WriteLine(format, "----", "---------");
-                foreach (var ei in enumInfos)
+                if (enumInfos.Count > 0)
                 {
-                    logger.WriteLine(format, ei.FullName, ei.TableName);
+                    var sb = new StringBuilder();
+
+                    var maxEnumName = enumInfos.Select(ei => ei.FullName.Length).Max();
+                    var format = $"    {{0,-{Math.Max(4, maxEnumName)}}}  {{1}}";
+                    
+                    sb.AppendFormat(format, "Enum", "SQL Table");
+                    sb.AppendLine();
+                    sb.AppendFormat(format, "----", "---------");
+                    foreach (var ei in enumInfos)
+                    {
+                        sb.AppendLine();
+                        sb.AppendFormat(format, ei.FullName, ei.TableName);
+                    }
+
+                    logger.Info(sb.ToString());
                 }
             }
-            logger.WriteLine();
 
             return enumInfos;
         }

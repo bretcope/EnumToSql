@@ -54,7 +54,13 @@
     <Compile Include="EnumSqlTableAttributeInfo.cs" />
     <Compile Include="EnumsToSqlWriter.cs" />
     <Compile Include="EnumValue.cs" />
-    <Compile Include="OutputFormat.cs" />
+    <Compile Include="LogFormatters.cs" />
+    <Compile Include="Logging\ILogFormatter.cs" />
+    <Compile Include="Logger.cs" />
+    <Compile Include="Logging\EnumsToSqlException.cs" />
+    <Compile Include="Logging\PlainFormatter.cs" />
+    <Compile Include="Logging\TeamCityFormatter.cs" />
+    <Compile Include="Severity.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Row.cs" />
