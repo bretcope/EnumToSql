@@ -57,7 +57,7 @@ class EnumSqlTableAttribute : Attribute
 
 However, there are optional properties you can choose to implement. You can also tell EnumsToSql to look for a different attribute name. See [EnumSqlTable Attribute](#enumsqltable-attribute) for details.
 
-## Advanced Usage
+## Documentation
 
 - [Integrated Auth](#integrated-auth)
 - [Id Column](#id-column)
