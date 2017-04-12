@@ -2,6 +2,8 @@
 
 A simple tool for replicating .NET enums to SQL Server.
 
+> Requires .NET Framework 4.6 or later and has only been tested with .NET Framework assemblies.
+
 ## Basic Usage
 
 Just mark the enums that you want to replicate:
