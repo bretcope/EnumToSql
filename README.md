@@ -75,7 +75,7 @@ However, there are optional properties you can choose to implement. You can also
 If you're using integrated auth, you can use the `--db` and `--server` arguments instead of providing a full connection string with `--conn`.
 
 ```
-> EnumsToSql.exe --asm c:\path\to\asm.dll --db MyDatabase --server MyServer
+> EnumToSql.exe --asm c:\path\to\asm.dll --db MyDatabase --server MyServer
 ```
 
 > `--server` is optional and defaults to "localhost".
@@ -170,7 +170,7 @@ The logging output is relatively plaintext by default. However, there are a few 
 
 ### EnumToSql Attribute
 
-By default, EnumsToSql looks for an attribute named "EnumToSql". You can customize the name using the `--attr` argument (e.g. `--attr CustomName`). The "Attribute" suffix is automatically appended to the name, unless it already ends with Attribute.
+By default, EnumToSql looks for an attribute named "EnumToSql". You can customize the name using the `--attr` argument (e.g. `--attr CustomName`). The "Attribute" suffix is automatically appended to the name, unless it already ends with Attribute.
 
 EnumToSql looks for the following properties and methods on the attribute:
 
