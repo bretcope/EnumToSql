@@ -167,9 +167,9 @@ namespace EnumToSql
 
         static EnumInfo TryGetEnumInfoFromType(Type enumType, string attributeName, XmlTypeDescription xmlDoc)
         {
-            var attrInfo = DuckTyping.GetEnumSqlTableInfo(enumType, attributeName);
+            var attrInfo = DuckTyping.GetEnumToSqlAttribute(enumType, attributeName);
 
-            if (attrInfo == null) // the enum wasn't marked with the EnumSqlTable attribute
+            if (attrInfo == null) // the enum wasn't marked with the EnumToSql attribute
                 return null;
 
             var schemaName = attrInfo.SchemaName;

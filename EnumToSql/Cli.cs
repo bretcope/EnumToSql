@@ -53,7 +53,7 @@ OPTIONS
                         Defaults to localhost.
 
   {ATTR} <value>        The name of the attribute which marks enums for
-                        replication to SQL Server. Defaults to ""{EnumsToSqlWriter.DEFAULT_ATTRIBUTE_NAME}"".
+                        replication to SQL Server. Defaults to ""{EnumToSqlReplicator.DEFAULT_ATTRIBUTE_NAME}"".
 
   {DELETE_MODE} <value> Controls what happens when an enum value no longer
                         exists in code, but still exists as a database row.
@@ -128,8 +128,8 @@ OPTIONS
                 }
 
                 var files = GetAssemblyFiles(argsDictionary);
-                var attributeName = argsDictionary.ContainsKey(ATTR) ? argsDictionary[ATTR] : EnumsToSqlWriter.DEFAULT_ATTRIBUTE_NAME;
-                var writer = EnumsToSqlWriter.Create(files, logger, attributeName);
+                var attributeName = argsDictionary.ContainsKey(ATTR) ? argsDictionary[ATTR] : EnumToSqlReplicator.DEFAULT_ATTRIBUTE_NAME;
+                var writer = EnumToSqlReplicator.Create(files, logger, attributeName);
 
                 if (!argsDictionary.ContainsKey(PREVIEW))
                 {

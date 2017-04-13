@@ -39,7 +39,7 @@ int   nvarchar(250)   nvarchar(max)  bit
 
 The command is idempotent and is intended to be run as part of a build chain. It will automatically update the SQL tables to match the current state of your code.
 
-#### Wait, where is the EnumSqlTable attribute?
+#### Wait, where is the EnumToSql attribute?
 
 Actually, you provide your own implementation. EnumToSql simply looks for an attribute with that name applied to one or more enums. The minimal required implementation is:
 
@@ -55,7 +55,7 @@ class EnumSqlTableAttribute : Attribute
 }
 ```
 
-However, there are optional properties you can choose to implement. You can also tell EnumToSql to look for a different attribute name. See [EnumSqlTable Attribute](#enumsqltable-attribute) for details.
+However, there are optional properties you can choose to implement. You can also tell EnumToSql.exe to look for a different attribute name. See [EnumToSql Attribute](#enumtosql-attribute) for details.
 
 ## Documentation
 
@@ -67,7 +67,7 @@ However, there are optional properties you can choose to implement. You can also
 - [Multiple Assemblies or Databases](#multiple-assemblies-or-databases)
 - [Failures](#failures)
 - [Logging Formats](#logging-formats)
-- [EnumSqlTable Attribute](#enumsqltable-attribute)
+- [EnumToSql Attribute](#enumtosql-attribute)
 - [Programmatic Interface](#programmatic-interface)
 
 ### Integrated Auth
@@ -93,7 +93,7 @@ SQL Server doesn't allow you to pick between signed and unsigned integers; size 
 | `int` or `uint`     | `int` (signed 32-bit)      |
 | `long` or `ulong`   | `bigint` (signed 64-bit)   |
 
-You can customize the name and type of the Id column by implementing optional properties on the [EnumSqlTable Attribute](#enumsqltable-attribute).
+You can customize the name and type of the Id column by implementing optional properties on the [EnumToSql Attribute](#enumtosql-attribute).
 
 > Note, the SQL schema needs to match _exactly_ what EnumToSql expects for any given table. If you do anything, like change a type or add a column, it will result in a failure.
 
@@ -147,7 +147,7 @@ If you delete an enum value from code, it may still exist as a row in a SQL tabl
 
 > __Note__: if you delete the entire enum itself, you'll need to manually drop the table from SQL. This section only applies to individual values of an enum.
 >
-> __Note__: There is probably a strong case to be made for allowing the EnumSqlTable attribute to override the deletion mode. Open an issue if you have a use case.
+> __Note__: There is probably a strong case to be made for allowing the EnumToSql attribute to override the deletion mode. Open an issue if you have a use case.
 
 ### Multiple Assemblies or Databases
 
@@ -168,9 +168,9 @@ EnumToSql will stop attempting to updating a database after the first failure. W
 
 The logging output is relatively plaintext by default. However, there are a few built-in formatters including colors, timestamps, and a TeamCity-specific formatter. Use the `--help` argument for more information, or see [LogFormatters.cs](https://github.com/bretcope/EnumToSql/master/EnumToSql/LogFormatters.cs). Feel free to implement your own formatter and submit a pull request.
 
-### EnumSqlTable Attribute
+### EnumToSql Attribute
 
-By default, EnumsToSql looks for an attribute named "EnumSqlTable". You can customize the name using the `--attr` argument (e.g. `--attr CustomName`). The "Attribute" suffix is automatically appended to the name, unless it already ends with Attribute.
+By default, EnumsToSql looks for an attribute named "EnumToSql". You can customize the name using the `--attr` argument (e.g. `--attr CustomName`). The "Attribute" suffix is automatically appended to the name, unless it already ends with Attribute.
 
 EnumToSql looks for the following properties on the attribute:
 
@@ -208,7 +208,7 @@ writer.UpdateDatabases(connectionStrings, DeletionMode.TryDelete, logger);
 
 An exception will be thrown if anything fails, but most useful information is still sent to the logger.
 
-You can also call invoke the command line interface programmatically via the static [Cli class](https://github.com/bretcope/EnumsToSql/blob/master/EnumToSql/Cli.cs). In fact, here is the entire implementation of EnumToSql's main method:
+You can also call invoke the command line interface programmatically via the static [Cli class](https://github.com/bretcope/EnumToSql/blob/master/EnumToSql/Cli.cs). In fact, here is the entire implementation of EnumToSql's main method:
 
 ```csharp
 static void Main(string[] args)

@@ -9,33 +9,33 @@ namespace EnumToSql
     /// <summary>
     /// The top level class for the EnumsToSql library. Create an instance by calling <see cref="Create"/>.
     /// </summary>
-    public class EnumsToSqlWriter
+    public class EnumToSqlReplicator
     {
         /// <summary>
         /// The default name of the attribute which marks enums for replication.
         /// </summary>
-        public const string DEFAULT_ATTRIBUTE_NAME = "EnumSqlTable";
+        public const string DEFAULT_ATTRIBUTE_NAME = "EnumToSql";
 
         /// <summary>
         /// The list of enums which will be replicated to SQL.
         /// </summary>
         public List<EnumInfo> Enums { get; }
 
-        EnumsToSqlWriter(List<EnumInfo> enums)
+        EnumToSqlReplicator(List<EnumInfo> enums)
         {
             Enums = enums;
         }
 
         /// <summary>
-        /// Creates a new instance of <see cref="EnumsToSqlWriter"/> based on a list of assembly file names.
+        /// Creates a new instance of <see cref="EnumToSqlReplicator"/> based on a list of assembly file names.
         /// </summary>
         /// <param name="assemblyFiles">The assembly file names to load (including relative or absolute paths).</param>
         /// <param name="logger">The stream to send logging information to.</param>
         /// <param name="attributeName">The name of the attribute which marks enums for replication.</param>
-        public static EnumsToSqlWriter Create(IEnumerable<string> assemblyFiles, Logger logger, string attributeName = DEFAULT_ATTRIBUTE_NAME)
+        public static EnumToSqlReplicator Create(IEnumerable<string> assemblyFiles, Logger logger, string attributeName = DEFAULT_ATTRIBUTE_NAME)
         {
             var enumInfos = EnumInfo.GetEnumsFromAssemblies(assemblyFiles, attributeName, logger);
-            return new EnumsToSqlWriter(enumInfos);
+            return new EnumToSqlReplicator(enumInfos);
         }
 
         /// <summary>

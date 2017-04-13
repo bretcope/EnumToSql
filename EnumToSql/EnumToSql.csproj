@@ -51,8 +51,8 @@
     <Compile Include="DuckTyping.cs" />
     <Compile Include="DeletionMode.cs" />
     <Compile Include="EnumInfo.cs" />
-    <Compile Include="EnumSqlTableAttributeInfo.cs" />
-    <Compile Include="EnumsToSqlWriter.cs" />
+    <Compile Include="EnumToSqlAttributeInfo.cs" />
+    <Compile Include="EnumToSqlReplicator.cs" />
     <Compile Include="EnumValue.cs" />
     <Compile Include="LogFormatters.cs" />
     <Compile Include="Logging\ILogFormatter.cs" />

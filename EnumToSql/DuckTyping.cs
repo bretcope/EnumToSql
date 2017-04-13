@@ -4,14 +4,14 @@ using System.Reflection;
 
 namespace EnumToSql
 {
-    // Provides duck-typing for the EnumSqlTable attribute
+    // Provides duck-typing for the EnumToSql attribute
     static class DuckTyping
     {
-        delegate EnumSqlTableAttributeInfo Getter(Attribute attr);
+        delegate EnumToSqlAttributeInfo Getter(Attribute attr);
 
         static readonly Dictionary<Type, Getter> s_gettersByType = new Dictionary<Type, Getter>();
 
-        public static EnumSqlTableAttributeInfo GetEnumSqlTableInfo(Type enumType, string attributeName)
+        public static EnumToSqlAttributeInfo GetEnumToSqlAttribute(Type enumType, string attributeName)
         {
             foreach (var data in enumType.GetCustomAttributesData())
             {
@@ -88,7 +88,7 @@ namespace EnumToSql
                 if (idColumnNameProp != null)
                     idColumnName = (string)idColumnNameProp.GetValue(attr);
 
-                return new EnumSqlTableAttributeInfo(tableName, schemaName, idColumnSize, idColumnName);
+                return new EnumToSqlAttributeInfo(tableName, schemaName, idColumnSize, idColumnName);
             };
 
             s_gettersByType[attrType] = getter;

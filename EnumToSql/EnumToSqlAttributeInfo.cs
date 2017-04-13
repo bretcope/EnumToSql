@@ -1,13 +1,13 @@
 ﻿namespace EnumToSql
 {
-    class EnumSqlTableAttributeInfo
+    class EnumToSqlAttributeInfo
     {
         public string TableName { get; }
         public string SchemaName { get; }
         public int IdColumnSize { get; }
         public string IdColumnName { get; }
 
-        internal EnumSqlTableAttributeInfo(string tableName, string schemaName, int idColumnSize, string idColumnName)
+        internal EnumToSqlAttributeInfo(string tableName, string schemaName, int idColumnSize, string idColumnName)
         {
             TableName = tableName;
             SchemaName = schemaName;
