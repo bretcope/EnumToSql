@@ -54,9 +54,19 @@ namespace EnumToSql
             if (idColumnNameProp != null && idColumnNameProp.PropertyType != typeof(string))
                 throw new InvalidOperationException($"Type {attrType.FullName} has a property named \"IdColumnName\" but it is not of type string.");
 
+            var setupMethod = attrType.GetMethod(
+                "Setup",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new[] {typeof(Type)},
+                null);
+
             // if this was going to be called a ton, a dynamic method would be a better choice, but we're not all that concerned about performance
             getter = (attr, enumType) =>
             {
+                if (setupMethod != null)
+                    setupMethod.Invoke(attr, new object[] {enumType});
+
                 var tableName = (string)tableNameProp.GetValue(attr);
 
                 if (string.IsNullOrEmpty(tableName))

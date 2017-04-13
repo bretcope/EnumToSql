@@ -172,14 +172,48 @@ The logging output is relatively plaintext by default. However, there are a few 
 
 By default, EnumsToSql looks for an attribute named "EnumToSql". You can customize the name using the `--attr` argument (e.g. `--attr CustomName`). The "Attribute" suffix is automatically appended to the name, unless it already ends with Attribute.
 
-EnumToSql looks for the following properties on the attribute:
+EnumToSql looks for the following properties and methods on the attribute:
 
-- __TableName__ `string` (required):  The name of the table where the enum should be replicated to. This must never be null or empty.
-- __SchemaName__ `string` (optional): The schema which the table lives on. If this property is missing, or returns null/empty, defaults to "dbo".
-- __IdColumnSize__ `int` (optional): The size (in bytes) of the "Id" column in SQL. This must not be less than the size of the enum's backing type. Valid values are 1, 2, 4, or 8. If the property is missing or returns zero, defaults to the size of the backing type.
-- __IdColumnName__ `string` (optional): Allows you to specify a column name other than "Id" for the first column. If the property is missing, or returns null/empty, defaults to "Id".
+```csharp
+class EnumToSqlAttribute : Attribute
+{
+    // REQUIRED
+    // The name of the table where the enum should be replicated to.
+    // This must never be null or empty.
+    public string TableName { get; }
+    
+    // OPTIONAL
+    // The schema which the table lives on. If this property is missing,
+    // or returns null/empty, defaults to "dbo".
+    public string SchemaName { get; }
+    
+    // OPTIONAL
+    // The size (in bytes) of the "Id" column in SQL. This must not be
+    // less than the size of the enum's backing type. Valid values are
+    // 1, 2, 4, or 8. If the property is missing or returns zero,
+    // defaults to the size of the backing type.
+    public int IdColumnSize { get; }
+    
+    // OPTIONAL
+    // Allows you to specify a column name other than "Id" for the first
+    // column. If the property is missing, or returns null/empty,
+    // defaults to "Id".
+    public string IdColumnName { get; }
+    
+    // OPTIONAL
+    // Called before any of the above properties are accessed. The
+    // argument "targetEnum" is the type of the enum which the attribute
+    // was applied to.
+    public void Setup(Type targetEnum)
+    {
+        // Implement this method if you want to dynamically generate
+        // properties, such as "TableName" based on the enum the
+        // attribute was applied to.
+    }
+}
+```
 
-> I'd be interested in exploring the ability to dynamically generate a table name based on the enum's name. Open an issue if you're interested.
+
 
 ### Programmatic Interface
 
