@@ -7,7 +7,7 @@ namespace EnumToSql
     // Provides duck-typing for the EnumToSql attribute
     static class DuckTyping
     {
-        delegate EnumToSqlAttributeInfo Getter(Attribute attr);
+        delegate EnumToSqlAttributeInfo Getter(Attribute attr, Type enumType);
 
         static readonly Dictionary<Type, Getter> s_gettersByType = new Dictionary<Type, Getter>();
 
@@ -19,16 +19,16 @@ namespace EnumToSql
                 {
                     var attr = enumType.GetCustomAttribute(data.AttributeType);
                     var attrType = attr.GetType();
-                    var getter = GetGetter(attrType, enumType);
+                    var getter = GetGetter(attrType);
 
-                    return getter(attr);
+                    return getter(attr, enumType);
                 }
             }
 
             return null;
         }
 
-        static Getter GetGetter(Type attrType, Type enumType)
+        static Getter GetGetter(Type attrType)
         {
             Getter getter;
 
@@ -55,7 +55,7 @@ namespace EnumToSql
                 throw new InvalidOperationException($"Type {attrType.FullName} has a property named \"IdColumnName\" but it is not of type string.");
 
             // if this was going to be called a ton, a dynamic method would be a better choice, but we're not all that concerned about performance
-            getter = (attr) =>
+            getter = (attr, enumType) =>
             {
                 var tableName = (string)tableNameProp.GetValue(attr);
 
