@@ -1,4 +1,4 @@
-﻿namespace EnumsToSql
+﻿namespace EnumToSql
 {
     class EnumSqlTableAttributeInfo
     {

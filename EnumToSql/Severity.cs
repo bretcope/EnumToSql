@@ -1,4 +1,4 @@
-﻿namespace EnumsToSql
+﻿namespace EnumToSql
 {
     /// <summary>
     /// Describes different levels of log severity.

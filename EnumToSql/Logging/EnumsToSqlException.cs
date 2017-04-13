@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace EnumsToSql.Logging
+namespace EnumToSql.Logging
 {
     /// <summary>
     /// The exception class used by EnumsToSql methods.

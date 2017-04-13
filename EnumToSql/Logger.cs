@@ -1,8 +1,8 @@
 ﻿using System;
 using System.IO;
-using EnumsToSql.Logging;
+using EnumToSql.Logging;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     /// <summary>
     /// Helper class for logging data from EnumToSql methods.

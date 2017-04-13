@@ -5,9 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using EnumsToSql.Logging;
+using EnumToSql.Logging;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     /// <summary>
     /// Describes informtation about an enum which should be replicated to SQL.

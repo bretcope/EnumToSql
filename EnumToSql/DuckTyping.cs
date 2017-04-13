@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     // Provides duck-typing for the EnumSqlTable attribute
     static class DuckTyping

@@ -1,6 +1,6 @@
 ﻿using System.Reflection;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     class AssemblyInfo
     {

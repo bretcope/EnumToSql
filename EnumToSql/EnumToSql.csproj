@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{7E128974-BF22-471F-B7E9-FCAE76082C77}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>EnumsToSql</RootNamespace>
-    <AssemblyName>EnumsToSql</AssemblyName>
+    <RootNamespace>EnumToSql</RootNamespace>
+    <AssemblyName>EnumToSql</AssemblyName>
     <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -22,7 +22,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\EnumsToSql.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\EnumToSql.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -32,7 +32,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\EnumsToSql.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\EnumToSql.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />

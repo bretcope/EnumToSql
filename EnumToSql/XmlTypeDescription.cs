@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     class XmlTypeDescription
     {

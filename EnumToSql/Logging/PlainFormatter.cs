@@ -1,9 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace EnumsToSql.Logging
+namespace EnumToSql.Logging
 {
     class PlainFormatter : ILogFormatter
     {

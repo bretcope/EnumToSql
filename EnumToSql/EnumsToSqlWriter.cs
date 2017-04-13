@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
-using EnumsToSql.Logging;
+using EnumToSql.Logging;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     /// <summary>
     /// The top level class for the EnumsToSql library. Create an instance by calling <see cref="Create"/>.

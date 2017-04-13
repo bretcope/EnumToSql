@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26228.9
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnumsToSql", "EnumsToSql\EnumsToSql.csproj", "{7E128974-BF22-471F-B7E9-FCAE76082C77}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnumToSql", "EnumToSql\EnumToSql.csproj", "{7E128974-BF22-471F-B7E9-FCAE76082C77}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

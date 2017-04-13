@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     /// <summary>
     /// Describes information about an individual enum value.

@@ -1,4 +1,4 @@
-﻿namespace EnumsToSql
+﻿namespace EnumToSql
 {
     /// <summary>
     /// Determines what to do when an enum exists in the database, but no longer exists in code.

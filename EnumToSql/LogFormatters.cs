@@ -1,6 +1,6 @@
-﻿using EnumsToSql.Logging;
+﻿using EnumToSql.Logging;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     /// <summary>
     /// Static collection of built-in logging formatters.

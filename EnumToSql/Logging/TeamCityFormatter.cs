@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text.RegularExpressions;
 
-namespace EnumsToSql.Logging
+namespace EnumToSql.Logging
 {
     class TeamCityFormatter : ILogFormatter
     {

@@ -1,4 +1,4 @@
-# EnumsToSql
+# EnumToSql
 
 A simple tool for replicating .NET enums to SQL Server.
 
@@ -41,7 +41,7 @@ The command is idempotent and is intended to be run as part of a build chain. It
 
 #### Wait, where is the EnumSqlTable attribute?
 
-Actually, you provide your own implementation. EnumsToSql simply looks for an attribute with that name applied to one or more enums. The minimal required implementation is:
+Actually, you provide your own implementation. EnumToSql simply looks for an attribute with that name applied to one or more enums. The minimal required implementation is:
 
 ```csharp
 class EnumSqlTableAttribute : Attribute
@@ -55,7 +55,7 @@ class EnumSqlTableAttribute : Attribute
 }
 ```
 
-However, there are optional properties you can choose to implement. You can also tell EnumsToSql to look for a different attribute name. See [EnumSqlTable Attribute](#enumsqltable-attribute) for details.
+However, there are optional properties you can choose to implement. You can also tell EnumToSql to look for a different attribute name. See [EnumSqlTable Attribute](#enumsqltable-attribute) for details.
 
 ## Documentation
 
@@ -95,7 +95,7 @@ SQL Server doesn't allow you to pick between signed and unsigned integers; size 
 
 You can customize the name and type of the Id column by implementing optional properties on the [EnumSqlTable Attribute](#enumsqltable-attribute).
 
-> Note, the SQL schema needs to match _exactly_ what EnumsToSql expects for any given table. If you do anything, like change a type or add a column, it will result in a failure.
+> Note, the SQL schema needs to match _exactly_ what EnumToSql expects for any given table. If you do anything, like change a type or add a column, it will result in a failure.
 
 ### Descriptions
 
@@ -138,7 +138,7 @@ For each row, IsActive column is set to 1 (true) if:
 
 ### Deletion Mode
 
-If you delete an enum value from code, it may still exist as a row in a SQL table. How EnumsToSql acts in this situation is controlled by the `--delete-mode` argument. It has four possible values:
+If you delete an enum value from code, it may still exist as a row in a SQL table. How EnumToSql acts in this situation is controlled by the `--delete-mode` argument. It has four possible values:
 
 - `mark-inactive`:  this is the default. Deleted values are marked as inactive in SQL (`IsActive = 0`).
 - `do-nothing`: deleted values are ignored.
@@ -157,22 +157,22 @@ The delimiter defaults to a comma, but can be set to any arbitrary string using 
 
 ### Failures
 
-EnumsToSql does not run updates inside a transaction. This helps simplify the code and minimize locking, but has the obvious disadvantage that it could leave a database in a partially updated state. In practice, the impact is minimal because:
+EnumToSql does not run updates inside a transaction. This helps simplify the code and minimize locking, but has the obvious disadvantage that it could leave a database in a partially updated state. In practice, the impact is minimal because:
 
 - The tool is idempotent, so a successful run will typically correct a previous failed run.
 - Deletions (most likely to fail) are run last, after inserts and updates.
 
-EnumsToSql will stop attempting to updating a database after the first failure. When updating multiple databases in parallel, all databases are attempted, even if a prior database failed. If parallel is disabled (with `--no-parallel`), EnumsToSql will not attempt to update the next database if the prior one failed.
+EnumToSql will stop attempting to updating a database after the first failure. When updating multiple databases in parallel, all databases are attempted, even if a prior database failed. If parallel is disabled (with `--no-parallel`), EnumToSql will not attempt to update the next database if the prior one failed.
 
 ### Logging Formats
 
-The logging output is relatively plaintext by default. However, there are a few built-in formatters including colors, timestamps, and a TeamCity-specific formatter. Use the `--help` argument for more information, or see [LogFormatters.cs](https://github.com/bretcope/EnumsToSql/blob/master/EnumsToSql/LogFormatters.cs). Feel free to implement your own formatter and submit a pull request.
+The logging output is relatively plaintext by default. However, there are a few built-in formatters including colors, timestamps, and a TeamCity-specific formatter. Use the `--help` argument for more information, or see [LogFormatters.cs](https://github.com/bretcope/EnumToSql/master/EnumToSql/LogFormatters.cs). Feel free to implement your own formatter and submit a pull request.
 
 ### EnumSqlTable Attribute
 
 By default, EnumsToSql looks for an attribute named "EnumSqlTable". You can customize the name using the `--attr` argument (e.g. `--attr CustomName`). The "Attribute" suffix is automatically appended to the name, unless it already ends with Attribute.
 
-EnumsToSql looks for the following properties on the attribute:
+EnumToSql looks for the following properties on the attribute:
 
 - __TableName__ `string` (required):  The name of the table where the enum should be replicated to. This must never be null or empty.
 - __SchemaName__ `string` (optional): The schema which the table lives on. If this property is missing, or returns null/empty, defaults to "dbo".
@@ -183,9 +183,9 @@ EnumsToSql looks for the following properties on the attribute:
 
 ### Programmatic Interface
 
-Although EnumsToSql is primarily designed as a command line interface, it can also be used as a library. You can add a reference to the exe, or recompile the project as a library if you'd prefer.
+Although EnumToSql is primarily designed as a command line interface, it can also be used as a library. You can add a reference to the exe, or recompile the project as a library if you'd prefer.
 
-The main class is [EnumsToSqlWriter](https://github.com/bretcope/EnumsToSql/blob/master/EnumsToSql/EnumsToSqlWriter.cs). Here's a minimal example:
+The main class is [EnumToSqlReplicator](https://github.com/bretcope/EnumToSql/blob/master/EnumToSql/EnumToSqlReplicator.cs). Here's a minimal example:
 
 ```csharp
 var assemblies = new []
@@ -202,13 +202,13 @@ var connectionStrings = new []
 };
 
 var logger = new Logger(Console.Out, LogFormatters.Plain);
-var writer = EnumsToSqlWriter.Create(assemblies, logger);
+var writer = EnumToSqlReplicator.Create(assemblies, logger);
 writer.UpdateDatabases(connectionStrings, DeletionMode.TryDelete, logger);
 ```
 
 An exception will be thrown if anything fails, but most useful information is still sent to the logger.
 
-You can also call invoke the command line interface programmatically via the static [Cli class](https://github.com/bretcope/EnumsToSql/blob/master/EnumsToSql/Cli.cs). In fact, here is the entire implementation of EnumsToSql's main method:
+You can also call invoke the command line interface programmatically via the static [Cli class](https://github.com/bretcope/EnumsToSql/blob/master/EnumToSql/Cli.cs). In fact, here is the entire implementation of EnumToSql's main method:
 
 ```csharp
 static void Main(string[] args)

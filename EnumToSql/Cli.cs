@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using EnumsToSql.Logging;
+using EnumToSql.Logging;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     /// <summary>
     /// Provides a command line interface to run EnumsToSql.

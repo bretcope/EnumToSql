@@ -1,4 +1,4 @@
-﻿namespace EnumsToSql.Logging
+﻿namespace EnumToSql.Logging
 {
     /// <summary>
     /// Defines the interface for formatting log messages.

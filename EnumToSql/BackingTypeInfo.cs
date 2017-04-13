@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     /// <summary>
     /// Describes informtation about an enum's backing type

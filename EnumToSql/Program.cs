@@ -1,8 +1,6 @@
-﻿
-using System;
-using System.IO;
+﻿using System;
 
-namespace EnumsToSql
+namespace EnumToSql
 {
     class Program
     {
