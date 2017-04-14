@@ -9,7 +9,7 @@ A simple tool for replicating .NET enums to SQL Server.
 Just mark the enums that you want to replicate:
 
 ```csharp
-[EnumSqlTable("Languages")]
+[EnumToSql("Languages")]
 enum Language
 {
     English = 0,
@@ -44,11 +44,11 @@ The command is idempotent and is intended to be run as part of a build chain. It
 Actually, you provide your own implementation. EnumToSql simply looks for an attribute with that name applied to one or more enums. The minimal required implementation is:
 
 ```csharp
-class EnumSqlTableAttribute : Attribute
+class EnumToSqlAttribute : Attribute
 {
     internal string TableName { get; }
 
-    internal EnumSqlTableAttribute(string tableName)
+    internal EnumToSqlAttribute(string tableName)
     {
         TableName = tableName;
     }
