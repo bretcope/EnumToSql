@@ -102,6 +102,9 @@ namespace EnumToSql
 
             if (setupMethod != null)
             {
+                if (setupMethod.ReturnType != typeof(void))
+                    throw new EnumsToSqlException($"Setup method does not return void. Attribute: {attrType.FullName}");
+
                 il.Emit(OpCodes.Ldloc_0);               // [attr]
                 il.Emit(OpCodes.Ldarg_1);               // [attr] [enumType]
                 il.Emit(OpCodes.Callvirt, setupMethod); // empty
