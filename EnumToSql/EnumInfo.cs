@@ -208,6 +208,16 @@ namespace EnumToSql
                 throw new EnumsToSqlException($"DeletionMode is {DeletionMode.MarkAsInactive}, but the {IS_ACTIVE} column is disabled. Enum: {FullName}");
             }
 
+            // make sure there are no duplicate column names
+            foreach (var a in columns)
+            {
+                foreach (var b in columns)
+                {
+                    if (a != b && a.Name == b.Name)
+                        throw new EnumsToSqlException($"Duplicate column name \"{a.Name}\". Enum: {FullName}");
+                }
+            }
+
             Columns = columns;
         }
 
