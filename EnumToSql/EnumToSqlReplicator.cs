@@ -42,10 +42,9 @@ namespace EnumToSql
         /// Updates the enum tables for multiple databases.
         /// </summary>
         /// <param name="connectionStrings">An enumeration of SQL Server connection strings. Each must include a specific database to connect to.</param>
-        /// <param name="deletionMode">Determines what to do when an enum value exists in the database, but no longer exists in code.</param>
         /// <param name="logger">The stream to send logging information to.</param>
         /// <param name="inParallel">If true, multiple databases may be updated in parallel (up to the number of CPUs).</param>
-        public void UpdateDatabases(IEnumerable<string> connectionStrings, DeletionMode deletionMode, Logger logger, bool inParallel = true)
+        public void UpdateDatabases(IEnumerable<string> connectionStrings, Logger logger, bool inParallel = true)
         {
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
@@ -65,7 +64,7 @@ namespace EnumToSql
                         {
                             try
                             {
-                                UpdateDatabase(connStr, deletionMode, childLogger);
+                                UpdateDatabase(connStr, childLogger);
                             }
                             catch (Exception ex)
                             {
@@ -87,7 +86,7 @@ namespace EnumToSql
             {
                 foreach (var connStr in connectionStrings)
                 {
-                    UpdateDatabase(connStr, deletionMode, logger);
+                    UpdateDatabase(connStr, logger);
                 }
             }
         }
@@ -96,9 +95,8 @@ namespace EnumToSql
         /// Updates the enum tables for a single database.
         /// </summary>
         /// <param name="connectionString">The SQL Server connection string. This must include a specific database to connect to.</param>
-        /// <param name="deletionMode">Determines what to do when an enum value exists in the database, but no longer exists in code.</param>
         /// <param name="logger">The stream to send logging information to.</param>
-        public void UpdateDatabase(string connectionString, DeletionMode deletionMode, Logger logger)
+        public void UpdateDatabase(string connectionString, Logger logger)
         {
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
@@ -111,7 +109,7 @@ namespace EnumToSql
                 using (var conn = new SqlConnection(connectionString))
                 {
                     conn.Open();
-                    UpdateDatabase(conn, deletionMode, logger);
+                    UpdateDatabase(conn, logger);
                 }
             }
             catch (Exception ex)
@@ -125,9 +123,8 @@ namespace EnumToSql
         /// Updates the enum tables for a single database.
         /// </summary>
         /// <param name="conn">An open SQL connection to the database you want to update.</param>
-        /// <param name="deletionMode">Determines what to do when an enum value exists in the database, but no longer exists in code.</param>
         /// <param name="logger">The stream to send logging information to.</param>
-        public void UpdateDatabase(SqlConnection conn, DeletionMode deletionMode, Logger logger)
+        public void UpdateDatabase(SqlConnection conn, Logger logger)
         {
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
@@ -142,7 +139,7 @@ namespace EnumToSql
                     foreach (var enumInfo in Enums)
                     {
                         var existingRows = SqlExecutor.GetTableRows(conn, enumInfo);
-                        var updatePlan = TableUpdatePlan.Create(enumInfo, existingRows, deletionMode);
+                        var updatePlan = TableUpdatePlan.Create(enumInfo, existingRows);
                         SqlExecutor.UpdateTable(conn, enumInfo, updatePlan, logger);
                     }
                 }

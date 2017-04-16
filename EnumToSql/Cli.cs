@@ -15,7 +15,6 @@ namespace EnumToSql
         const string DB = "--db";
         const string SERVER = "--server";
         const string ATTR = "--attr";
-        const string DELETE_MODE = "--delete-mode";
         const string FORMAT = "--format";
         const string DELIMITER = "--delimiter";
         const string NO_PARALLEL = "--no-parallel";
@@ -54,26 +53,6 @@ OPTIONS
 
   {ATTR} <value>        The name of the attribute which marks enums for
                         replication to SQL Server. Defaults to ""{EnumToSqlReplicator.DEFAULT_ATTRIBUTE_NAME}"".
-
-  {DELETE_MODE} <value> Controls what happens when an enum value no longer
-                        exists in code, but still exists as a database row.
-
-                        Possible values:
-
-                            ""mark-inactive"": (default) Sets IsActive = 0 for
-                                             these rows.
-
-                            ""do-nothing"":    These rows are ignored.
-
-                            ""delete"":        Deletes these rows from the
-                                             database. If the rows cannot be
-                                             deleted, this is treated as a
-                                             failure.
-
-                            ""try-delete"":    Attempts to delete the rows, but
-                                             failures due to constraint
-                                             (foreign key) violations are 
-                                             treated as warnings.
 
   {FORMAT} <value>      Sets the output format. Possible values:
 
@@ -134,11 +113,10 @@ OPTIONS
                 if (!argsDictionary.ContainsKey(PREVIEW))
                 {
                     var conns = GetConnectionStrings(argsDictionary);
-
-                    var deletionMode = GetDeletionMode(argsDictionary);
+                    
                     var parallel = !argsDictionary.ContainsKey(NO_PARALLEL);
 
-                    writer.UpdateDatabases(conns, deletionMode, logger, parallel);
+                    writer.UpdateDatabases(conns, logger, parallel);
 
                     logger.Info("Updates complete");
                 }
@@ -210,29 +188,6 @@ OPTIONS
             }
 
             return LogFormatters.Plain;
-        }
-
-        static DeletionMode GetDeletionMode(Dictionary<string, string> args)
-        {
-            string deleteString;
-            if (args.TryGetValue(DELETE_MODE, out deleteString))
-            {
-                switch (deleteString.ToLowerInvariant())
-                {
-                    case "mark-inactive":
-                        return DeletionMode.MarkAsInactive;
-                    case "do-nothing":
-                        return DeletionMode.DoNothing;
-                    case "delete":
-                        return DeletionMode.Delete;
-                    case "try-delete":
-                        return DeletionMode.TryDelete;
-                    default:
-                        throw new Exception($"Invalid argument value: {DELETE_MODE} \"{deleteString}\"");
-                }
-            }
-
-            return DeletionMode.MarkAsInactive;
         }
 
         static string[] GetConnectionStrings(Dictionary<string, string> args)
@@ -317,7 +272,6 @@ OPTIONS
                     case DB:
                     case SERVER:
                     case ATTR:
-                    case DELETE_MODE:
                     case FORMAT:
                     case DELIMITER:
                         var value = i + 1 < args.Length ? args[i + 1] : null;

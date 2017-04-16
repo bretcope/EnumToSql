@@ -46,12 +46,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="AttributeInfo.cs" />
     <Compile Include="BackingTypeInfo.cs" />
     <Compile Include="Cli.cs" />
+    <Compile Include="ColumnInfo.cs" />
     <Compile Include="DuckTyping.cs" />
     <Compile Include="DeletionMode.cs" />
     <Compile Include="EnumInfo.cs" />
-    <Compile Include="EnumToSqlAttributeInfo.cs" />
     <Compile Include="EnumToSqlReplicator.cs" />
     <Compile Include="EnumValue.cs" />
     <Compile Include="LogFormatters.cs" />
@@ -64,6 +65,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Row.cs" />
+    <Compile Include="SqlCreator.cs" />
     <Compile Include="SqlExecutor.cs" />
     <Compile Include="TableUpdatePlan.cs" />
     <Compile Include="XmlAssemblyDocument.cs" />

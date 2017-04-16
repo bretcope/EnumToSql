@@ -8,11 +8,6 @@ namespace EnumToSql
     public class EnumValue
     {
         /// <summary>
-        /// The maximum length of an enum value's name. Names longer than this will trigger a failure.
-        /// </summary>
-        public const int MAX_NAME_LENGTH = 250;
-
-        /// <summary>
         /// The actual value of the enum. This will be an integer primitive.
         /// </summary>
         public object Id { get; }
@@ -25,6 +20,10 @@ namespace EnumToSql
         /// </summary>
         public string Name { get; }
         /// <summary>
+        /// The display name of the value, if provided via the DisplayName attribute. Otherwise, the same as <see cref="Name"/>.
+        /// </summary>
+        public string DisplayName { get; }
+        /// <summary>
         /// True if the value is not deprecated (marked with the Obsolete attribute).
         /// </summary>
         public bool IsActive { get; }
@@ -33,10 +32,11 @@ namespace EnumToSql
         /// </summary>
         public string Description { get; }
 
-        internal EnumValue(object id, string name, bool isActive, string description)
+        internal EnumValue(object id, string name, string displayName, bool isActive, string description)
         {
             Id = id;
             Name = name;
+            DisplayName = displayName;
             IsActive = isActive;
             Description = description;
 
@@ -62,7 +62,7 @@ namespace EnumToSql
 
         internal Row GetRow()
         {
-            return new Row(LongId, Name, Description, IsActive);
+            return new Row(LongId, Name, DisplayName, Description, IsActive);
         }
     }
 }

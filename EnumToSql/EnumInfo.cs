@@ -14,48 +14,201 @@ namespace EnumToSql
     /// </summary>
     public class EnumInfo
     {
-        /// <summary>
-        /// The enum's full name (including namespace).
-        /// </summary>
-        public string FullName => Type.FullName;
-        /// <summary>
-        /// The name of the SQL table to replicate this enum to.
-        /// </summary>
-        public string TableName { get; }
-        /// <summary>
-        /// The SQL Server schema name for the enum's table.
-        /// </summary>
-        public string SchemaName { get; }
-        /// <summary>
-        /// The size (in bytes) of the Id column for the table. Must be 1, 2, 4, or 8.
-        /// </summary>
-        public int IdColumnSize { get; }
-        /// <summary>
-        /// The name of the Id column for the table.
-        /// </summary>
-        public string IdColumnName { get; }
+        internal const string ID = "Id";
+        internal const string NAME = "Name";
+        internal const string DISPLAY_NAME = "DisplayName";
+        internal const string DESCRIPTION = "Description";
+        internal const string IS_ACTIVE = "IsActive";
+
+        // these are pre-escaped and bracketed versions of the user-provided names which are appropriate for inlining as table/column names in a query
+        internal string SqlTable { get; }
+        internal string SqlSchema { get; }
+
+        internal List<ColumnInfo> Columns { get; private set; }
+
         /// <summary>
         /// The enum type.
         /// </summary>
         public Type Type { get; }
         /// <summary>
+        /// The enum's full name (including namespace).
+        /// </summary>
+        public string FullName => Type.FullName;
+        /// <summary>
         /// The enum's backing type.
         /// </summary>
         public BackingTypeInfo BackingTypeInfo { get; }
+
+        /// <summary>
+        /// The name of the SQL table to replicate this enum to.
+        /// </summary>
+        public string Table { get; }
+        /// <summary>
+        /// The SQL Server schema name for the enum's table.
+        /// </summary>
+        public string Schema { get; }
+        /// <summary>
+        /// Controls what happens when an enum value no longer exists in code, but still exists as a database row.
+        /// </summary>
+        public DeletionMode DeletionMode { get; }
+
+        /// <summary>
+        /// Information about the Id column, or null if disabled.
+        /// </summary>
+        public ColumnInfo IdColumn { get; private set; }
+        /// <summary>
+        /// Information about the Name column, or null if disabled.
+        /// </summary>
+        public ColumnInfo NameColumn { get; private set; }
+        /// <summary>
+        /// Information about the DisplayName column, or null if disabled.
+        /// </summary>
+        public ColumnInfo DisplayNameColumn { get; private set; }
+        /// <summary>
+        /// Information about the Description column, or null if disabled.
+        /// </summary>
+        public ColumnInfo DescriptionColumn { get; private set; }
+        /// <summary>
+        /// Information about the IsActive column, or null if disabled.
+        /// </summary>
+        public ColumnInfo IsActiveColumn { get; private set; }
+
         /// <summary>
         /// Information about the enum's values.
         /// </summary>
         public EnumValue[] Values { get; }
 
-        EnumInfo(string tableName, string schemaName, int idColumnSize, string idColumnName, Type type, BackingTypeInfo backingTypeInfo, EnumValue[] values)
+        EnumInfo(Type enumType, AttributeInfo attrInfo, EnumValue[] values)
         {
-            TableName = TrimSqlName(tableName);
-            SchemaName = TrimSqlName(schemaName);
-            IdColumnSize = idColumnSize;
-            IdColumnName = TrimSqlName(idColumnName);
-            Type = type;
-            BackingTypeInfo = backingTypeInfo;
+            Schema = SqlCreator.TrimSqlName(attrInfo.Schema);
+            SqlSchema = SqlCreator.BracketSqlName(Schema);
+
+            Table = SqlCreator.TrimSqlName(attrInfo.Table);
+            SqlTable = SqlCreator.BracketSqlName(Table);
+
+            if (string.IsNullOrEmpty(Schema))
+                throw new EnumsToSqlException($"Schema name cannot be null or empty. Enum: {FullName}");
+
+            if (string.IsNullOrEmpty(Table))
+                throw new EnumsToSqlException($"Table name cannot be null or empty. Enum: {FullName}");
+
+            DeletionMode mode;
+            if (Enum.TryParse(attrInfo.DeletionMode, true, out mode))
+                DeletionMode = mode;
+            else
+                throw new EnumsToSqlException($"DeletionMode \"{attrInfo.DeletionMode}\" is not valid. Enum: {FullName}");
+
+            Type = enumType;
+            BackingTypeInfo = BackingTypeInfo.Get(enumType);
+
             Values = values;
+
+            SetupColumns(attrInfo);
+        }
+
+        void SetupColumns(AttributeInfo attrInfo)
+        {
+            var columns = new List<ColumnInfo>();
+
+            var idSize = attrInfo.IdColumnSize == 0 ? BackingTypeInfo.Size : attrInfo.IdColumnSize;
+            if (idSize < BackingTypeInfo.Size)
+                throw new EnumsToSqlException($"IdColumnSize is smaller than the enum's backing type. Enum: {FullName}");
+
+            switch (idSize)
+            {
+                case 1:
+                case 2:
+                case 4:
+                case 8:
+                    break;
+                default:
+                    throw new InvalidOperationException($"{idSize} is not a valid IdColumnSize. Must be 0 (default), 1, 2, 4, or 8. Enum: {FullName}");
+            }
+
+            IdColumn = new ColumnInfo(ID, attrInfo.IdColumn, idSize, SqlCreator.GetIntegerColumnType(idSize));
+            columns.Add(IdColumn);
+
+            if (string.IsNullOrEmpty(IdColumn.Name))
+                throw new EnumsToSqlException($"Id column name cannot be null or empty. Enum: {FullName}");
+
+            if (attrInfo.NameColumnEnabled)
+            {
+                var name = attrInfo.NameColumn;
+                var size = attrInfo.NameColumnSize;
+
+                NameColumn = new ColumnInfo(NAME, name, size, "nvarchar");
+                columns.Add(NameColumn);
+                
+                if (string.IsNullOrEmpty(NameColumn.Name))
+                    throw new EnumsToSqlException($"NameColumn property cannot be null or empty. Enum: {FullName}");
+
+                if (size < 1)
+                    throw new EnumsToSqlException($"NameColumnSize cannot be less than 1. Enum: {FullName}");
+
+                foreach (var value in Values)
+                {
+                    if (value.Name.Length > size)
+                        throw new Exception($"Enum value name exceeds the maximum length of {size}.\n  Enum: {FullName}\n  Value: {value.Name}");
+                }
+
+            }
+
+            if (attrInfo.DisplayNameColumnEnabled)
+            {
+                var name = attrInfo.DisplayNameColumn;
+                var size = attrInfo.DisplayNameColumnSize;
+
+                DisplayNameColumn = new ColumnInfo(DISPLAY_NAME, name, size, "nvarchar");
+                columns.Add(DisplayNameColumn);
+
+                if (string.IsNullOrEmpty(name))
+                    throw new EnumsToSqlException($"DisplayNameColumn property cannot be null or empty. Enum: {FullName}");
+
+                if (size < 1)
+                    throw new EnumsToSqlException($"DisplayNameColumnSize cannot be less than 1. Enum: {FullName}");
+
+                foreach (var value in Values)
+                {
+                    if (value.DisplayName.Length > size)
+                        throw new Exception($"Enum value display name exceeds the maximum length of {size}.\n  Enum: {FullName}\n  Value: {value.Name}");
+                }
+            }
+
+            if (attrInfo.DescriptionColumnEnabled)
+            {
+                var name = attrInfo.DescriptionColumn;
+                var size = attrInfo.DescriptionColumnSize;
+
+                DescriptionColumn = new ColumnInfo(DESCRIPTION, name, size, "nvarchar");
+                columns.Add(DescriptionColumn);
+
+                if (string.IsNullOrEmpty(DescriptionColumn.Name))
+                    throw new EnumsToSqlException($"DescriptionColumn property cannot be null or empty. Enum: {FullName}");
+
+                if (size < 1)
+                    throw new EnumsToSqlException($"DescriptionColumnSize cannot be less than 1. Enum: {FullName}");
+
+                foreach (var value in Values)
+                {
+                    if (value.Description.Length > size)
+                        throw new Exception($"Enum value description exceeds the maximum length of {size}.\n  Enum: {FullName}\n  Value: {value.Name}");
+                }
+            }
+
+            if (attrInfo.IsActiveColumnEnabled)
+            {
+                IsActiveColumn = new ColumnInfo(IS_ACTIVE, attrInfo.IsActiveColumn, 1, "bit");
+                columns.Add(IsActiveColumn);
+
+                if (string.IsNullOrEmpty(IsActiveColumn.Name))
+                    throw new EnumsToSqlException($"IsActiveColumn property cannot be null or empty. Enum: {FullName}");
+            }
+            else if (DeletionMode == DeletionMode.MarkAsInactive)
+            {
+                throw new EnumsToSqlException($"DeletionMode is {DeletionMode.MarkAsInactive}, but the {IS_ACTIVE} column is disabled. Enum: {FullName}");
+            }
+
+            Columns = columns;
         }
 
         internal static List<EnumInfo> GetEnumsFromAssemblies(IEnumerable<string> assemblyFiles, string attributeName, Logger logger)
@@ -155,7 +308,7 @@ namespace EnumToSql
                     foreach (var ei in enumInfos)
                     {
                         sb.AppendLine();
-                        sb.AppendFormat(format, ei.FullName, ei.TableName);
+                        sb.AppendFormat(format, ei.FullName, ei.Table);
                     }
 
                     logger.Info(sb.ToString());
@@ -167,34 +320,13 @@ namespace EnumToSql
 
         static EnumInfo TryGetEnumInfoFromType(Type enumType, string attributeName, XmlTypeDescription xmlDoc)
         {
-            var attrInfo = DuckTyping.GetEnumToSqlAttribute(enumType, attributeName);
+            var attrInfo = DuckTyping.GetAttributeInfo(enumType, attributeName);
 
             if (attrInfo == null) // the enum wasn't marked with the EnumToSql attribute
                 return null;
 
-            var schemaName = attrInfo.SchemaName;
-            if (string.IsNullOrWhiteSpace(schemaName))
-                schemaName = "dbo";
-
-            var backingTypeInfo = BackingTypeInfo.Get(enumType);
-
-            var idColumnSize = attrInfo.IdColumnSize;
-            if (idColumnSize == 0)
-            {
-                idColumnSize = backingTypeInfo.Size;
-            }
-            else if (idColumnSize < backingTypeInfo.Size)
-            {
-                throw new Exception($"IdColumnSize ({idColumnSize}) is smaller than the backing type for enum {enumType.FullName}");
-            }
-
-            var idColumnName = attrInfo.IdColumnName;
-            if (string.IsNullOrWhiteSpace(idColumnName))
-                idColumnName = "Id";
-
             var values = GetEnumValues(enumType, xmlDoc);
-
-            return new EnumInfo(attrInfo.TableName, schemaName, idColumnSize, idColumnName, enumType, backingTypeInfo, values);
+            return new EnumInfo(enumType, attrInfo, values);
         }
 
         static EnumValue[] GetEnumValues(Type enumType, XmlTypeDescription xmlDoc)
@@ -208,10 +340,7 @@ namespace EnumToSql
 
                 var id = field.GetRawConstantValue();
                 var name = field.Name;
-
-                if (name.Length > EnumValue.MAX_NAME_LENGTH)
-                    throw new Exception($"Enum value name exceeds the maximum length of {EnumValue.MAX_NAME_LENGTH}.\n  Enum: {enumType.FullName}\n  Value: {name}");
-
+                var displayName = field.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName ?? name;
                 var isActive = field.GetCustomAttribute<ObsoleteAttribute>() == null;
 
                 // first preference is to get the description from XML comments
@@ -230,7 +359,7 @@ namespace EnumToSql
                     }
                 }
 
-                values[i] = new EnumValue(id, name, isActive, description);
+                values[i] = new EnumValue(id, name, displayName, isActive, description);
             }
 
             Array.Sort(values, ValueComparer);
@@ -247,17 +376,6 @@ namespace EnumToSql
                 return 0;
 
             return 1;
-        }
-
-        static string TrimSqlName(string name)
-        {
-            name = name.Trim();
-            if (name.StartsWith("[") && name.EndsWith("]") && name.Length > 2)
-            {
-                name = name.Substring(1, name.Length - 2);
-            }
-
-            return name;
         }
     }
 }

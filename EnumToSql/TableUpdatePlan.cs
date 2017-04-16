@@ -18,13 +18,14 @@ namespace EnumToSql
             DeletionMode = deletionMode;
         }
 
-        public static TableUpdatePlan Create(EnumInfo enumInfo, List<Row> existingRows, DeletionMode deletionMode)
+        public static TableUpdatePlan Create(EnumInfo info, List<Row> existingRows)
         {
             var add = new List<Row>();
             var update = new List<Row>();
             var delete = new List<Row>();
+            var deletionMode = info.DeletionMode;
 
-            var values = enumInfo.Values;
+            var values = info.Values;
 
             var vi = 0;
             var ri = 0;
@@ -66,7 +67,7 @@ namespace EnumToSql
                         throw new Exception("TableUpdatePlan has broken logic. This is a bug.");
 
                     // We have a value and a matching row. Check if anything needs updated.
-                    if (value.Name != row.Name || value.Description != row.Description || value.IsActive != row.IsActive)
+                    if (RowNeedsUpdated(info, value, row))
                     {
                         update.Add(value.GetRow());
                     }
@@ -77,6 +78,23 @@ namespace EnumToSql
             }
 
             return new TableUpdatePlan(add, update, delete, deletionMode);
+        }
+
+        static bool RowNeedsUpdated(EnumInfo info, EnumValue value, Row row)
+        {
+            if (info.NameColumn != null && value.Name != row.Name)
+                return true;
+
+            if (info.DisplayNameColumn != null && value.DisplayName != row.DisplayName)
+                return true;
+
+            if (info.DescriptionColumn != null && value.Description != row.Description)
+                return true;
+
+            if (info.IsActiveColumn != null && value.IsActive != row.IsActive)
+                return true;
+
+            return false;
         }
     }
 }

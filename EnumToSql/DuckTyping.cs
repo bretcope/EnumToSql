@@ -1,17 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reflection;
+using System.Reflection.Emit;
+using EnumToSql.Logging;
 
 namespace EnumToSql
 {
     // Provides duck-typing for the EnumToSql attribute
     static class DuckTyping
     {
-        delegate EnumToSqlAttributeInfo Getter(Attribute attr, Type enumType);
+        delegate AttributeInfo Getter(Attribute attr, Type enumType);
 
         static readonly Dictionary<Type, Getter> s_gettersByType = new Dictionary<Type, Getter>();
 
-        public static EnumToSqlAttributeInfo GetEnumToSqlAttribute(Type enumType, string attributeName)
+        internal static AttributeInfo GetAttributeInfo(Type enumType, string attributeName)
         {
             foreach (var data in enumType.GetCustomAttributesData())
             {
@@ -31,78 +34,125 @@ namespace EnumToSql
         static Getter GetGetter(Type attrType)
         {
             Getter getter;
+            if (!s_gettersByType.TryGetValue(attrType, out getter))
+            {
+                getter = CreateGetter(attrType);
+                s_gettersByType[attrType] = getter;
+            }
 
-            if (s_gettersByType.TryGetValue(attrType, out getter))
-                return getter;
+            return getter;
+        }
 
-            const BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        static Getter CreateGetter(Type attrType)
+        {
+            var name = "AttributeInfoGetter_" + attrType.FullName;
+            var infoType = typeof(AttributeInfo);
+            var paramTypes = new[] { typeof(Attribute), typeof(Type) };
+            var dm = new DynamicMethod(name, infoType, paramTypes, true);
+            var il = dm.GetILGenerator();
 
-            var tableNameProp = attrType.GetProperty("TableName", bindingFlags);
-            var schemaNameProp = attrType.GetProperty("SchemaName", bindingFlags);
-            var idColumnSizeProp = attrType.GetProperty("IdColumnSize", bindingFlags);
-            var idColumnNameProp = attrType.GetProperty("IdColumnName", bindingFlags);
+            il.DeclareLocal(attrType);
+            il.Emit(OpCodes.Ldarg_0);               // [attr]
+            il.Emit(OpCodes.Castclass, attrType);   // [attr]
+            il.Emit(OpCodes.Stloc_0);               // empty
 
-            if (tableNameProp == null || tableNameProp.PropertyType != typeof(string))
-                throw new InvalidOperationException($"Type {attrType.FullName} does not have a string \"TableName\" property.");
+            EmitSetupCall(il, attrType);
 
-            if (schemaNameProp != null && schemaNameProp.PropertyType != typeof(string))
-                throw new InvalidOperationException($"Type {attrType.FullName} has a property named \"SchemaName\" but it is not of type string.");
+            var constructor = infoType.GetConstructor(Type.EmptyTypes);
+            il.Emit(OpCodes.Newobj, constructor); // [info]
 
-            if (idColumnSizeProp != null && idColumnSizeProp.PropertyType != typeof(int))
-                throw new InvalidOperationException($"Type {attrType.FullName} has a property named \"IdColumnSize\" but it is not of type int.");
+            var tableNameExists = EmitProperty(nameof(AttributeInfo.Table), "", il, attrType);
+            if (!tableNameExists)
+                throw new EnumsToSqlException($"{attrType.FullName} is missing required property \"{nameof(AttributeInfo.Table)}\"");
 
-            if (idColumnNameProp != null && idColumnNameProp.PropertyType != typeof(string))
-                throw new InvalidOperationException($"Type {attrType.FullName} has a property named \"IdColumnName\" but it is not of type string.");
+            EmitProperty(nameof(AttributeInfo.Schema), "dbo", il, attrType);
+            EmitProperty(nameof(AttributeInfo.DeletionMode), nameof(DeletionMode.MarkAsInactive), il, attrType);
 
+            EmitProperty(nameof(AttributeInfo.IdColumn), "Id", il, attrType);
+            EmitProperty(nameof(AttributeInfo.IdColumnSize), 0, il, attrType);
+
+            EmitProperty(nameof(AttributeInfo.NameColumn), "Name", il, attrType);
+            EmitProperty(nameof(AttributeInfo.NameColumnSize), 250, il, attrType);
+            EmitProperty(nameof(AttributeInfo.NameColumnEnabled), true, il, attrType);
+
+            EmitProperty(nameof(AttributeInfo.DisplayNameColumn), "DisplayName", il, attrType);
+            EmitProperty(nameof(AttributeInfo.DisplayNameColumnSize), 250, il, attrType);
+            EmitProperty(nameof(AttributeInfo.DisplayNameColumnEnabled), true, il, attrType);
+
+            EmitProperty(nameof(AttributeInfo.DescriptionColumn), "Description", il, attrType);
+            EmitProperty(nameof(AttributeInfo.DescriptionColumnSize), int.MaxValue, il, attrType);
+            EmitProperty(nameof(AttributeInfo.DescriptionColumnEnabled), true, il, attrType);
+
+            EmitProperty(nameof(AttributeInfo.IsActiveColumn), "IsActive", il, attrType);
+            EmitProperty(nameof(AttributeInfo.IsActiveColumnEnabled), true, il, attrType);
+
+            il.Emit(OpCodes.Ret);
+
+            return (Getter)dm.CreateDelegate(typeof(Getter));
+        }
+
+        static void EmitSetupCall(ILGenerator il, Type attrType)
+        {
             var setupMethod = attrType.GetMethod(
                 "Setup",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                 null,
-                new[] {typeof(Type)},
+                new[] { typeof(Type) },
                 null);
 
-            // if this was going to be called a ton, a dynamic method would be a better choice, but we're not all that concerned about performance
-            getter = (attr, enumType) =>
+            if (setupMethod != null)
             {
-                if (setupMethod != null)
-                    setupMethod.Invoke(attr, new object[] {enumType});
+                il.Emit(OpCodes.Ldloc_0);               // [attr]
+                il.Emit(OpCodes.Ldarg_1);               // [attr] [enumType]
+                il.Emit(OpCodes.Callvirt, setupMethod); // empty
+            }
+        }
 
-                var tableName = (string)tableNameProp.GetValue(attr);
+        static bool EmitProperty(string name, object defaultValue, ILGenerator il, Type attrType)
+        {
+            // Initial stack: [info]
 
-                if (string.IsNullOrEmpty(tableName))
-                    throw new InvalidOperationException($"TableName is null or empty. Enum: {enumType.FullName}");
+            const BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var attrProp = attrType.GetProperty(name, bindingFlags);
+            var infoProp = typeof(AttributeInfo).GetProperty(name, bindingFlags);
 
-                string schemaName = null;
-                if (schemaNameProp != null)
-                    schemaName = (string)schemaNameProp.GetValue(attr);
-                
-                var idColumnSize = 0;
-                if (idColumnSizeProp != null)
-                {
-                    idColumnSize = (int)idColumnSizeProp.GetValue(attr);
+            var propType = defaultValue.GetType();
 
-                    switch(idColumnSize)
-                    {
-                        case 0:
-                        case 1:
-                        case 2:
-                        case 4:
-                        case 8:
-                            break;
-                        default:
-                            throw new InvalidOperationException($"{idColumnSize} is not a valid IdColumnSize. Must be 0 (default), 1, 2, 4, or 8. Enum: {enumType.FullName}");
-                    }
-                }
+            Debug.Assert(infoProp.PropertyType == propType);
 
-                string idColumnName = null;
-                if (idColumnNameProp != null)
-                    idColumnName = (string)idColumnNameProp.GetValue(attr);
+            il.Emit(OpCodes.Dup); // [info] [info]
 
-                return new EnumToSqlAttributeInfo(tableName, schemaName, idColumnSize, idColumnName);
-            };
+            var propExists = attrProp?.GetMethod != null;
 
-            s_gettersByType[attrType] = getter;
-            return getter;
+            if (propExists)
+            {
+                if (attrProp.PropertyType != propType)
+                    throw new Exception($"{attrType.FullName} has a property named {name}, but it is not of type {propType.Name}");
+
+                il.Emit(OpCodes.Ldloc_0);                      // [info] [info] [attr]
+                il.Emit(OpCodes.Callvirt, attrProp.GetMethod); // [info] [info] [value]
+            }
+            else if (propType == typeof(string))
+            {
+                il.Emit(OpCodes.Ldstr, (string)defaultValue); // [info] [info] [value]
+            }
+            else if (propType == typeof(int))
+            {
+                il.Emit(OpCodes.Ldc_I4, (int)defaultValue); // [info] [info] [value]
+            }
+            else if (propType == typeof(bool))
+            {
+                var op = (bool)defaultValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0;
+                il.Emit(op); // [info] [info] [value]
+            }
+            else
+            {
+                throw new NotImplementedException($"Unexpected property type {propType.Name}. This is a bug in EnumToSql.");
+            }
+
+            il.Emit(OpCodes.Call, infoProp.SetMethod);     // [info]
+
+            return propExists;
         }
     }
 }

@@ -2,39 +2,59 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Text;
 using EnumToSql.Logging;
 
 namespace EnumToSql
 {
     class SqlExecutor
     {
-        const int ID_ORDINAL = 0;
-        const int NAME_ORDINAL = 1;
-        const int DESC_ORDINAL = 2;
-        const int ACTIVE_ORDINAL = 3;
+        struct SchemaOrdinals
+        {
+            public int Id;
+            public int Name;
+            public int DisplayName;
+            public int Description;
+            public int IsActive;
 
-        public static List<Row> GetTableRows(SqlConnection conn, EnumInfo enumInfo)
+            public static SchemaOrdinals New()
+            {
+                var ordinals = new SchemaOrdinals();
+                ordinals.Id = -1;
+                ordinals.Name = -1;
+                ordinals.DisplayName = -1;
+                ordinals.Description = -1;
+                ordinals.IsActive = -1;
+
+                return ordinals;
+            }
+        }
+
+        public static List<Row> GetTableRows(SqlConnection conn, EnumInfo info)
         {
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = CreateTableAndSelect(enumInfo);
+                cmd.CommandText = SqlCreator.CreateTableAndSelect(info);
 
                 using (var rdr = cmd.ExecuteReader())
                 {
-                    if (!IsExpectedSchema(enumInfo, rdr))
-                        throw new InvalidOperationException($"Table {enumInfo.SchemaName}{enumInfo.TableName} does not match the expected schema.");
+                    SchemaOrdinals ordinals;
+                    if (!TryGetOrdinals(info, rdr, out ordinals))
+                        throw new InvalidOperationException($"Table {info.Schema}.{info.Table} does not match the expected schema.");
 
                     var rows = new List<Row>();
-                    var idSize = enumInfo.IdColumnSize;
+                    var idSize = info.IdColumn.Size;
 
                     while (rdr.Read())
                     {
-                        var id = ReadIdColumn(rdr, idSize);
-                        var name = rdr.GetString(NAME_ORDINAL);
-                        var desc = rdr.GetString(DESC_ORDINAL);
-                        var isActive = rdr.GetBoolean(ACTIVE_ORDINAL);
+                        var id = ReadIdColumn(rdr, ordinals.Id, idSize);
+                        
+                        var name = ordinals.Name == -1 ? null : rdr.GetString(ordinals.Name);
+                        var displayName = ordinals.DisplayName == -1 ? null : rdr.GetString(ordinals.DisplayName);
+                        var description = ordinals.Description == -1 ? null : rdr.GetString(ordinals.Description);
+                        var isActive = ordinals.IsActive == -1 ? false : rdr.GetBoolean(ordinals.IsActive);
 
-                        rows.Add(new Row(id, name, desc, isActive));
+                        rows.Add(new Row(id, name, displayName, description, isActive));
                     }
 
                     return rows;
@@ -42,36 +62,33 @@ namespace EnumToSql
             }
         }
 
-        public static void UpdateTable(SqlConnection conn, EnumInfo enumInfo, TableUpdatePlan plan, Logger logger)
+        public static void UpdateTable(SqlConnection conn, EnumInfo info, TableUpdatePlan plan, Logger logger)
         {
             if (plan.Add.Count == 0 && plan.Update.Count == 0 && plan.Delete.Count == 0)
                 return;
 
-            using (logger.OpenBlock($"Updating {enumInfo.SchemaName}.{enumInfo.TableName}"))
+            using (logger.OpenBlock($"Updating {info.Schema}.{info.Table}"))
             {
                 try
                 {
-                    var table = $"[{EscapeSqlName(enumInfo.SchemaName)}].[{EscapeSqlName(enumInfo.TableName)}]";
-                    var idCol = "[" + EscapeSqlName(enumInfo.IdColumnName) + "]";
-
                     if (plan.Add.Count > 0)
                     {
-                        var sql = $"insert into {table} ({idCol}, Name, Description, IsActive) values (@id, @name, @description, @isActive);";
+                        var sql = SqlCreator.GetInsertSql(info);
 
                         foreach (var row in plan.Add)
                         {
-                            ExecuteUpdate(conn, sql, row);
+                            ExecuteUpdate(conn, sql, info, row);
                             logger.Info($"Added {row.Name}");
                         }
                     }
 
                     if (plan.Update.Count > 0)
                     {
-                        var sql = $"update {table} set Name = @name, Description = @description, IsActive = @isActive where {idCol} = @id;";
+                        var sql = SqlCreator.GetUpdateSql(info);
 
                         foreach (var row in plan.Update)
                         {
-                            ExecuteUpdate(conn, sql, row);
+                            ExecuteUpdate(conn, sql, info, row);
                             logger.Info($"Updated {row.Name}");
                         }
                     }
@@ -82,12 +99,12 @@ namespace EnumToSql
 
                         if (plan.DeletionMode == DeletionMode.MarkAsInactive)
                         {
-                            sql = $"update {table} set IsActive = 0 where {idCol} = @id;";
+                            sql = $"update {info.SqlSchema}.{info.SqlTable} set {info.IsActiveColumn.SqlName} = 0 where {info.IdColumn.SqlName} = @{EnumInfo.ID};";
                             successMessage = "Marked deleted value \"{0}\" as inactive";
                         }
                         else
                         {
-                            sql = $"delete from {table} where {idCol} = @id;";
+                            sql = $"delete from {info.SqlSchema}.{info.SqlTable} where {info.IdColumn.SqlName} = @{EnumInfo.ID};";
                             successMessage = "Deleted {0}";
                         }
 
@@ -109,98 +126,103 @@ namespace EnumToSql
                 catch (Exception ex)
                 {
                     logger.Exception(ex);
-                    throw new EnumsToSqlException($"Failed to update table {enumInfo.SchemaName}.{enumInfo.TableName}", isLogged: true);
+                    throw new EnumsToSqlException($"Failed to update table {info.Schema}.{info.Table}", isLogged: true);
                 }
             }
         }
 
-        static string CreateTableAndSelect(EnumInfo enumInfo)
+
+        static bool TryGetOrdinals(EnumInfo info, SqlDataReader rdr, out SchemaOrdinals ordinals)
         {
-            var schemaString = EscapeString(enumInfo.SchemaName);
-            var tableString = EscapeString(enumInfo.TableName);
+            ordinals = SchemaOrdinals.New();
 
-            var schema = EscapeSqlName(enumInfo.SchemaName);
-            var table = EscapeSqlName(enumInfo.TableName);
-            var id = EscapeSqlName(enumInfo.IdColumnName);
-            var idType = GetIdColumnType(enumInfo.IdColumnSize);
-
-            return $@"
-if not exists (select * from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA = '{schemaString}' and TABLE_NAME = '{tableString}')
-begin
-    create table [{schema}].[{table}]
-    (
-        [{id}] {idType} not null,
-        Name nvarchar({EnumValue.MAX_NAME_LENGTH}) not null,
-        Description nvarchar(max) not null,
-        IsActive bit not null,
-
-        constraint [PK_{table}] primary key clustered ([{id}])
-    );
-end
-
-select * from [{schema}].[{table}] order by [{id}] asc;
-";
-        }
-
-        static bool IsExpectedSchema(EnumInfo enumInfo, SqlDataReader rdr)
-        {
             var schema = rdr.GetSchemaTable();
-            var columns = GetColumnInfos(schema);
+            var columns = GetSqlColumns(schema);
 
-            return columns.Length == 4
-                   // Id
-                   && columns[ID_ORDINAL].Name == enumInfo.IdColumnName
-                   && columns[ID_ORDINAL].Size == enumInfo.IdColumnSize
-                   && columns[ID_ORDINAL].Type == GetIdColumnType(enumInfo.IdColumnSize)
-                   && columns[ID_ORDINAL].AllowsNull == false
-                   && columns[ID_ORDINAL].IsIdentity == false
-                   // Name
-                   && columns[NAME_ORDINAL].Name == "Name"
-                   && columns[NAME_ORDINAL].Size == EnumValue.MAX_NAME_LENGTH
-                   && columns[NAME_ORDINAL].Type == "nvarchar"
-                   && columns[NAME_ORDINAL].AllowsNull == false
-                   && columns[NAME_ORDINAL].IsIdentity == false
-                   // Description
-                   && columns[DESC_ORDINAL].Name == "Description"
-                   && columns[DESC_ORDINAL].Size == int.MaxValue
-                   && columns[DESC_ORDINAL].Type == "nvarchar"
-                   && columns[DESC_ORDINAL].AllowsNull == false
-                   && columns[DESC_ORDINAL].IsIdentity == false
-                   // IsActive
-                   && columns[ACTIVE_ORDINAL].Name == "IsActive"
-                   && columns[ACTIVE_ORDINAL].Size == 1
-                   && columns[ACTIVE_ORDINAL].Type == "bit"
-                   && columns[ACTIVE_ORDINAL].AllowsNull == false
-                   && columns[ACTIVE_ORDINAL].IsIdentity == false
-                ;
+            if (columns.Length != info.Columns.Count)
+                return false;
+
+            for (var i = 0; i < columns.Length; i++)
+            {
+                var sqlCol = columns[i];
+
+                if (sqlCol.AllowsNull || sqlCol.IsIdentity)
+                    return false;
+
+                ColumnInfo col;
+
+                if (sqlCol.Name == info.IdColumn.Name)
+                {
+                    ordinals.Id = i;
+                    col = info.IdColumn;
+                }
+                else if (sqlCol.Name == info.NameColumn?.Name)
+                {
+                    ordinals.Name = i;
+                    col = info.NameColumn;
+                }
+                else if (sqlCol.Name == info.DisplayNameColumn?.Name)
+                {
+                    ordinals.DisplayName = i;
+                    col = info.DisplayNameColumn;
+                }
+                else if (sqlCol.Name == info.DescriptionColumn?.Name)
+                {
+                    ordinals.Description = i;
+                    col = info.DescriptionColumn;
+                }
+                else if (sqlCol.Name == info.IsActiveColumn?.Name)
+                {
+                    ordinals.IsActive = i;
+                    col = info.IsActiveColumn;
+                }
+                else
+                {
+                    return false;
+                }
+
+                if (sqlCol.Type != col.SqlType || sqlCol.Size != col.Size)
+                    return false;
+            }
+
+            return true;
         }
 
-        static long ReadIdColumn(SqlDataReader rdr, int size)
+        static long ReadIdColumn(SqlDataReader rdr, int ordinal, int size)
         {
             switch (size)
             {
                 case 1:
-                    return rdr.GetByte(ID_ORDINAL);
+                    return rdr.GetByte(ordinal);
                 case 2:
-                    return rdr.GetInt16(ID_ORDINAL);
+                    return rdr.GetInt16(ordinal);
                 case 4:
-                    return rdr.GetInt32(ID_ORDINAL);
+                    return rdr.GetInt32(ordinal);
                 case 8:
-                    return rdr.GetInt64(ID_ORDINAL);
+                    return rdr.GetInt64(ordinal);
                 default:
-                    throw new Exception($"Unexpected Id column size {size}");
+                    throw new Exception($"Unexpected {EnumInfo.ID} column size {size}");
             }
         }
 
-        static void ExecuteUpdate(SqlConnection conn, string sql, Row row)
+        static void ExecuteUpdate(SqlConnection conn, string sql, EnumInfo info, Row row)
         {
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = sql;
-                cmd.Parameters.AddWithValue("id", row.Id);
-                cmd.Parameters.AddWithValue("name", row.Name);
-                cmd.Parameters.AddWithValue("description", row.Description);
-                cmd.Parameters.AddWithValue("isActive", row.IsActive);
+                cmd.Parameters.AddWithValue(EnumInfo.ID, row.Id);
+
+                if (info.NameColumn != null)
+                    cmd.Parameters.AddWithValue(EnumInfo.NAME, row.Name);
+
+                if (info.DisplayNameColumn != null)
+                    cmd.Parameters.AddWithValue(EnumInfo.DISPLAY_NAME, row.Name);
+
+                if (info.DescriptionColumn != null)
+                    cmd.Parameters.AddWithValue(EnumInfo.DESCRIPTION, row.Description);
+
+                if (info.IsActiveColumn != null)
+                    cmd.Parameters.AddWithValue(EnumInfo.IS_ACTIVE, row.IsActive);
 
                 cmd.ExecuteNonQuery();
             }
@@ -213,7 +235,7 @@ select * from [{schema}].[{table}] order by [{id}] asc;
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = sql;
-                    cmd.Parameters.AddWithValue("id", id);
+                    cmd.Parameters.AddWithValue(EnumInfo.ID, id);
 
                     cmd.ExecuteNonQuery();
 
@@ -226,34 +248,8 @@ select * from [{schema}].[{table}] order by [{id}] asc;
             }
         }
 
-        static string EscapeSqlName(string name)
-        {
-            return name.Replace("]", "]]");
-        }
 
-        static string EscapeString(string s)
-        {
-            return s.Replace("'", "''");
-        }
-
-        static string GetIdColumnType(int size)
-        {
-            switch (size)
-            {
-                case 1:
-                    return "tinyint";
-                case 2:
-                    return "smallint";
-                case 4:
-                    return "int";
-                case 8:
-                    return "bigint";
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(size), $"Unexpected Id column size {size}");
-            }
-        }
-
-        struct ColumnInfo
+        struct SqlColumn
         {
             public string Name { get; set; }
             public int Size { get; set; }
@@ -262,7 +258,7 @@ select * from [{schema}].[{table}] order by [{id}] asc;
             public bool IsIdentity { get; set; }
         }
 
-        static ColumnInfo[] GetColumnInfos(DataTable schema)
+        static SqlColumn[] GetSqlColumns(DataTable schema)
         {
             var nameIndex = -1;
             var sizeIndex = -1;
@@ -294,7 +290,7 @@ select * from [{schema}].[{table}] order by [{id}] asc;
             }
 
             var count = schema.Rows.Count;
-            var infos = new ColumnInfo[count];
+            var infos = new SqlColumn[count];
 
             for (var i = 0; i < count; i++)
             {
