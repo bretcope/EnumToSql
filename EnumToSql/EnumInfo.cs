@@ -343,20 +343,16 @@ namespace EnumToSql
                 var displayName = field.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName ?? name;
                 var isActive = field.GetCustomAttribute<ObsoleteAttribute>() == null;
 
-                // first preference is to get the description from XML comments
-                string description = null;
-                xmlDoc?.FieldSummaries?.TryGetValue(name, out description);
+                // first preference is to get the description from the Description attribute
+                var description = field.GetCustomAttribute<DescriptionAttribute>()?.Description;
 
-                if (string.IsNullOrWhiteSpace(description))
+                if (description == null)
                 {
-                    // second choice is the Description attribute
-                    description = field.GetCustomAttribute<DescriptionAttribute>()?.Description;
+                    // second choice is an XML summary comment
+                    xmlDoc?.FieldSummaries?.TryGetValue(name, out description);
 
-                    if (string.IsNullOrWhiteSpace(description))
-                    {
-                        //  sadly we don't have any description available
+                    if (description == null) // sadly we don't have any description available
                         description = "";
-                    }
                 }
 
                 values[i] = new EnumValue(id, name, displayName, isActive, description);

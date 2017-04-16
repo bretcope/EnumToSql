@@ -104,6 +104,18 @@ EnumToSql looks for the [DisplayNameAttribute](https://docs.microsoft.com/en-us/
 
 EnumToSql can pick up description text one of two ways:
 
+__[DescriptionAttribute](https://docs.microsoft.com/en-us/dotnet/api/System.ComponentModel.DescriptionAttribute)__
+
+```csharp
+enum MyEnum
+{
+    [Description("My description here.")]
+    Value = 0,
+}
+```
+
+or
+
 __XML Summary Comments__
 
 ```csharp
@@ -116,21 +128,9 @@ enum MyEnum
 }
 ```
 
-or
-
-__[DescriptionAttribute](https://docs.microsoft.com/en-us/dotnet/api/System.ComponentModel.DescriptionAttribute)__
-
-```csharp
-enum MyEnum
-{
-    [Description("My description here.")]
-    Value = 0,
-}
-```
-
 In order for xml summary comments to be picked up, there must be a an xml file in the same directory as the loaded assembly. For example: `c:\path\to\MyAssembly.dll` would need xml file: `c:\path\to\MyAssembly.XML`.
 
-If both xml summary comments and the Description attribute exists, the xml summary comments take precedence.
+If the Description attribute exists, it takes precedence over xml summary comments.
 
 The column defaults to type `nvarchar(max) not null`, but its size can be customized via the [EnumToSql Attribute](#enumtosql-attribute). The column can also be disabled or renamed.
 
