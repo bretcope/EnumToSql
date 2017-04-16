@@ -6,7 +6,7 @@ A simple tool for replicating .NET enums to SQL Server.
 
 ## Basic Usage
 
-Just mark the enums that you want to replicate:
+Mark the enums that you want to replicate with a duck-typed [EnumToSql Attribute](#enumtosql-attribute):
 
 ```csharp
 [EnumToSql("Languages")]
@@ -29,40 +29,45 @@ And then run the command line tool (acquired from building the project in this r
 This will create a table called "Languages":
 
 ```
-Id    Name            Description    IsActive
-int   nvarchar(250)   nvarchar(max)  bit
-----  --------------  -------------  --------
-0     "English"       ""             1
-1     "German"        ""             1
-2     "Spanish"       ""             1
+Id    Name            DisplayName    Description    IsActive
+int   nvarchar(250)   nvarchar(250)  nvarchar(max)  bit
+----  --------------  -------------  -------------  --------
+0     "English"       "English"      ""             1
+1     "German"        "German"       ""             1
+2     "Spanish"       "Spanish"      ""             1
 ```
+
+> See the [DisplayName](#displayname-column) and [Description](#description-column) sections for how to control those column values.
 
 The command is idempotent and is intended to be run as part of a build chain. It will automatically update the SQL tables to match the current state of your code.
 
-#### Wait, where is the EnumToSql attribute?
+#### Wait, how do I get the EnumToSql attribute?
 
-Actually, you provide your own implementation. EnumToSql simply looks for an attribute with that name applied to one or more enums. The minimal required implementation is:
+The attribute is [duck-typed](https://en.wikipedia.org/wiki/Duck_typing), so you actually provide your own implementation. EnumToSql simply looks for an attribute with that name. The minimum implementation only requires a `Table` property:
 
 ```csharp
 class EnumToSqlAttribute : Attribute
 {
-    internal string TableName { get; }
+    string Table { get; }
 
-    internal EnumToSqlAttribute(string tableName)
+    internal EnumToSqlAttribute(string table)
     {
-        TableName = tableName;
+        Table = table;
     }
 }
 ```
 
-However, there are optional properties you can choose to implement. You can also tell EnumToSql.exe to look for a different attribute name. See [EnumToSql Attribute](#enumtosql-attribute) for details.
+However, you can control a lot more about the table, such as column names and sizes, by implementing optional properties. You can also pick a different attribute name if you want. See [EnumToSql Attribute](#enumtosql-attribute) for details.
 
 ## Documentation
 
+- Columns
+    - [Id](#id-column)
+    - [Name](#name-column)
+    - [DisplayName](#displayname-column)
+    - [Descriptions](#description-column)
+    - [IsActive](#isactive-column)
 - [Integrated Auth](#integrated-auth)
-- [Id Column](#id-column)
-- [Descriptions](#descriptions)
-- [IsActive](#isactive)
 - [Deletion Mode](#deletion-mode)
 - [Multiple Assemblies or Databases](#multiple-assemblies-or-databases)
 - [Failures](#failures)
@@ -70,17 +75,9 @@ However, there are optional properties you can choose to implement. You can also
 - [EnumToSql Attribute](#enumtosql-attribute)
 - [Programmatic Interface](#programmatic-interface)
 
-### Integrated Auth
-
-If you're using integrated auth, you can use the `--db` and `--server` arguments instead of providing a full connection string with `--conn`.
-
-```
-> EnumToSql.exe --asm c:\path\to\asm.dll --db MyDatabase --server MyServer
-```
-
-> `--server` is optional and defaults to "localhost".
-
 ### Id Column
+
+The `Id` column represents the integer value of the enum. It also serves as the primary key for the table.
 
 By default, the `Id` column in SQL is the same size as the enum's backing type. In the "Basic Usage" example, the enum was backed by an `int`, therefore the SQL column was an `int`.
 
@@ -95,9 +92,15 @@ SQL Server doesn't allow you to pick between signed and unsigned integers; size 
 
 You can customize the name and type of the Id column by implementing optional properties on the [EnumToSql Attribute](#enumtosql-attribute).
 
-> Note, the SQL schema needs to match _exactly_ what EnumToSql expects for any given table. If you do anything, like change a type or add a column, it will result in a failure.
+### Name Column
 
-### Descriptions
+The `Name` column represents the code name for the enum value. The column defaults to type `nvarchar(250) not null`, but its size can be customized via the [EnumToSql Attribute](#enumtosql-attribute). The column can also be disabled or renamed.
+
+### DisplayName Column
+
+EnumToSql looks for the [DisplayNameAttribute](https://docs.microsoft.com/en-us/dotnet/api/System.ComponentModel.DisplayNameAttribute) on enum values to populate the `DisplayName` column. If the attribute is not found, the column falls back to the code name (same as the Name column). The column defaults to type `nvarchar(250) not null`, but its size can be customized via the [EnumToSql Attribute](#enumtosql-attribute). The column can also be disabled or renamed.
+
+### Description Column
 
 EnumToSql can pick up description text one of two ways:
 
@@ -115,7 +118,7 @@ enum MyEnum
 
 or
 
-__[System.ComponentModel.DescriptionAttribute](https://msdn.microsoft.com/en-us/library/system.componentmodel.descriptionattribute(v=vs.110).aspx)__
+__[DescriptionAttribute](https://docs.microsoft.com/en-us/dotnet/api/System.ComponentModel.DescriptionAttribute)__
 
 ```csharp
 enum MyEnum
@@ -129,40 +132,52 @@ In order for xml summary comments to be picked up, there must be a an xml file i
 
 If both xml summary comments and the Description attribute exists, the xml summary comments take precedence.
 
-### IsActive
+The column defaults to type `nvarchar(max) not null`, but its size can be customized via the [EnumToSql Attribute](#enumtosql-attribute). The column can also be disabled or renamed.
+
+### IsActive Column
 
 For each row, IsActive column is set to 1 (true) if:
 
 - The enum value still exists in code, and
 - It is not marked with the `[Obsolete]` attribute.
 
+The column can be renamed or disabled via the [EnumToSql Attribute](#enumtosql-attribute).
+
+### Integrated Auth
+
+If you're using integrated auth, you can use the `--db` and `--server` arguments instead of providing a full connection string with `--conn`.
+
+```
+> EnumToSql.exe --asm c:\path\to\asm.dll --db MyDatabase --server MyServer
+```
+
+> `--server` is optional and defaults to "localhost".
+
 ### Deletion Mode
 
-If you delete an enum value from code, it may still exist as a row in a SQL table. How EnumToSql acts in this situation is controlled by the `--delete-mode` argument. It has four possible values:
+If you delete an enum value from code, it may still exist as a row in a SQL table. How EnumToSql acts in this situation is controlled by the optional `DeletionMode` property on the [EnumToSql Attribute](#enumtosql-attribute). It has four possible values:
 
-- `mark-inactive`:  this is the default. Deleted values are marked as inactive in SQL (`IsActive = 0`).
-- `do-nothing`: deleted values are ignored.
-- `delete`: values deleted in code are also deleted from SQL Server. If the delete fails (e.g. foreign key violations), it is treated as a fatal error.
-- `try-delete`: attempts to delete from SQL, but failures due to foreign key violations are treated as warnings.
+- `MarkAsInactive`:  this is the default. Deleted values are marked as inactive in SQL (`IsActive = 0`). Note: if you use this value, the [IsActive column](#isactive-column) must not be disabled.
+- `DoNothing`: deleted values are ignored.
+- `Delete`: values deleted in code are also deleted from SQL Server. If the delete fails (e.g. foreign key violations), it is treated as a [failure](#failures).
+- `TryDelete`: attempts to delete from SQL, but failures due to foreign key violations are treated as warnings.
 
 > __Note__: if you delete the entire enum itself, you'll need to manually drop the table from SQL. This section only applies to individual values of an enum.
 >
-> __Note__: There is probably a strong case to be made for allowing the EnumToSql attribute to override the deletion mode. Open an issue if you have a use case.
 
 ### Multiple Assemblies or Databases
 
-The `--asm`, `--conn`, and `--db` all accept a comma-delimited list rather than a single value. Multiple databases are updated in parallel (unless `--no-parallel` was set).
+The `--asm`, `--conn`, and `--db` all accept a comma-delimited list, rather than just a single value. Multiple databases are updated in parallel (unless `--no-parallel` was set).
+
+>  Do not include any whitespace around the comma. `--db Database1,Database2` is correct. `--db Database1, Database2` will fail.
 
 The delimiter defaults to a comma, but can be set to any arbitrary string using the `--delimiter` argument.
 
 ### Failures
 
-EnumToSql does not run updates inside a transaction. This helps simplify the code and minimize locking, but has the obvious disadvantage that it could leave a database in a partially updated state. In practice, the impact is minimal because:
+EnumToSql does not run updates inside a transaction. This helps simplify the code and minimize locking, but has the obvious disadvantage that it could leave a database in a partially updated state. In practice, the impact is minimal because the tool is idempotent, so a successful run will typically correct a previous failed run.
 
-- The tool is idempotent, so a successful run will typically correct a previous failed run.
-- Deletions (most likely to fail) are run last, after inserts and updates.
-
-EnumToSql will stop attempting to updating a database after the first failure. When updating multiple databases in parallel, all databases are attempted, even if a prior database failed. If parallel is disabled (with `--no-parallel`), EnumToSql will not attempt to update the next database if the prior one failed.
+EnumToSql will stop attempting to updating a database after the first failure. When updating multiple databases in parallel, it will attempt to update each database, even if a prior database failed. If parallel is disabled (with `--no-parallel`), EnumToSql will not attempt to update the next database if the prior one failed.
 
 ### Logging Formats
 
@@ -172,48 +187,95 @@ The logging output is relatively plaintext by default. However, there are a few 
 
 By default, EnumToSql looks for an attribute named "EnumToSql". You can customize the name using the `--attr` argument (e.g. `--attr CustomName`). The "Attribute" suffix is automatically appended to the name, unless it already ends with Attribute.
 
-EnumToSql looks for the following properties and methods on the attribute:
+> __Example use case__: You have some enums which need to replicate to database A, and other enums in the same assembly which need to replicate to database B. To accomplish this, use two different attribute names (one for each database) and simply run EnumToSql twice with different `--attr` and `--conn` arguments.
+
+The EnumToSql attribute requires a `Table` property, but there are several optional properties and one optional method which allow you to control several things about the table, including column names, sizes, [deletion mode](#deletion-mode), and more. Here's a complete list of members EnumToSql will look for on the attribute:
 
 ```csharp
 class EnumToSqlAttribute : Attribute
 {
     // REQUIRED
     // The name of the table where the enum should be replicated to.
-    // This must never be null or empty.
-    public string TableName { get; }
+    string Table { get; }
     
-    // OPTIONAL
-    // The schema which the table lives on. If this property is missing,
-    // or returns null/empty, defaults to "dbo".
-    public string SchemaName { get; }
+    // The schema which the table lives on. Defaults to "dbo" if property is
+    // not implemented.
+    string Schema { get; }
+
+    // Controls what happens when an enum value no longer exists in code, but
+    // still exists as a database row. See the "Deletion Mode" section in this
+    // README for more information. Defaults to "MarkAsInactive" if property is
+    // not implemented. 
+    string DeletionMode { get; }
     
-    // OPTIONAL
+    // Controls the name of the "Id" column.
+    string IdColumnName { get; }
+    
     // The size (in bytes) of the "Id" column in SQL. This must not be
     // less than the size of the enum's backing type. Valid values are
     // 1, 2, 4, or 8. If the property is missing or returns zero,
     // defaults to the size of the backing type.
-    public int IdColumnSize { get; }
+    int IdColumnSize { get; }
     
-    // OPTIONAL
-    // Allows you to specify a column name other than "Id" for the first
-    // column. If the property is missing, or returns null/empty,
-    // defaults to "Id".
-    public string IdColumnName { get; }
-    
-    // OPTIONAL
+    // Controls the name of the "Name" column.
+    string NameColumn { get; }
+
+    // Controls the size (in 2-byte chars) of the "Name" column. Must be big
+    // enough to fit the name of each of the enum's values. Defaults to 250 if
+    // the property is not implemented. Use int.MaxValue for "max".
+    int NameColumnSize { get; }
+
+    // Enables or disables the "Name" column. Defaults to true if the property
+    // is not implemented. 
+    bool NameColumnEnabled { get; }
+
+    // Controls the name of the "DisplayName" column.
+    string DisplayNameColumn { get; }
+
+    // Controls the size (in 2-byte chars) of the "DisplayName" column. Must be
+    // big enough to fit the display name of each of the enum's values.
+    // Defaults to 250 if the property is not implemented. Use int.MaxValue for
+    // "max".
+    int DisplayNameColumnSize { get; }
+
+    // Enables or disables the "DisplayName" column. Defaults to true if the
+    // property is not implemented. 
+    bool DisplayNameColumnEnabled { get; }
+
+    // Controls the name of the "Description" column.
+    string DescriptionColumn { get; }
+
+    // Controls the size (in 2-byte chars) of the "Description" column. Must be
+    // big enough to fit the description of each of the enum's values. Defaults
+    // to int.MaxValue if the property is not implemented.
+    int DescriptionColumnSize { get; }
+
+    // Enables or disables the "Description" column. Defaults to true if the
+    // property is not implemented.
+    bool DescriptionColumnEnabled { get; }
+
+    // Controls the name of the "IsActive" column.
+    string IsActiveColumn { get; }
+
+    // Enables or disables the "IsActive" column. Defaults to true if the
+    // property is not implemented. Note: if you set this property to false,
+    // you must implement the "DeletionMode" property and set it to an accepted
+    // value other than "MarkAsInactive".
+    bool IsActiveColumnEnabled { get; }
+
     // Called before any of the above properties are accessed. The
     // argument "targetEnum" is the type of the enum which the attribute
     // was applied to.
-    public void Setup(Type targetEnum)
+    void Setup(Type targetEnum)
     {
         // Implement this method if you want to dynamically generate
-        // properties, such as "TableName" based on the enum the
-        // attribute was applied to.
+        // properties, such as "Table" based on the enum the attribute was
+        // applied to.
     }
 }
 ```
 
-
+Note, __the existing SQL schema needs to match _exactly_ what EnumToSql expects__ for any given table. EnumToSql will create a table if it doesn't already exist, but if the table already exists, and the list of columns (name/size/type) doesn't match what was expected, it will be reported as a [failure](#failures).
 
 ### Programmatic Interface
 
@@ -236,8 +298,8 @@ var connectionStrings = new []
 };
 
 var logger = new Logger(Console.Out, LogFormatters.Plain);
-var writer = EnumToSqlReplicator.Create(assemblies, logger);
-writer.UpdateDatabases(connectionStrings, DeletionMode.TryDelete, logger);
+var enumToSql = EnumToSqlReplicator.Create(assemblies, logger);
+enumToSql.UpdateDatabases(connectionStrings, logger);
 ```
 
 An exception will be thrown if anything fails, but most useful information is still sent to the logger.
