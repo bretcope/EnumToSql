@@ -307,10 +307,9 @@ An exception will be thrown if anything fails, but most useful information is st
 You can also call invoke the command line interface programmatically via the static [Cli class](https://github.com/bretcope/EnumToSql/blob/master/EnumToSql/Cli.cs). In fact, here is the entire implementation of EnumToSql's main method:
 
 ```csharp
-static void Main(string[] args)
+static int Main(string[] args)
 {
-    var success = Cli.Execute(args, Console.Out);
-    Environment.Exit(success ? 0 : 1);
+    return Cli.Execute(args, Console.Out) ? 0 : 1;
 }
 ```
 

@@ -4,10 +4,9 @@ namespace EnumToSql
 {
     class Program
     {
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
-            var success = Cli.Execute(args, Console.Out);
-            Environment.Exit(success ? 0 : 1);
+            return Cli.Execute(args, Console.Out) ? 0 : 1;
         }
     }
 }
